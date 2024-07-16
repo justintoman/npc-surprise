@@ -45,17 +45,24 @@ type CharacterTable struct {
 	client *supabase.Client
 }
 
-func (db CharacterTable) GetAll() (*[]Character, error) {
+func (db CharacterTable) GetAll() ([]Character, error) {
 	data, _, err := db.client.From("characters").Select("*", "exact", false).Execute()
-	var characters *[]Character
-	json.Unmarshal(data, characters)
+	characters := make([]Character, 0)
+	json.Unmarshal(data, &characters)
 	return characters, err
 }
 
-func (db CharacterTable) Get(id int) (*Character, error) {
+func (db CharacterTable) GetAllByPlayerId(id string) ([]Character, error) {
+	data, _, err := db.client.From("characters").Select("*", "exact", false).Filter("player_id", "eq", id).Execute()
+	characters := make([]Character, 0)
+	json.Unmarshal(data, &characters)
+	return characters, err
+}
+
+func (db CharacterTable) Get(id int) (Character, error) {
 	data, _, err := db.client.From("characters").Select("*", "exact", false).Filter("id", "eq", strconv.Itoa(id)).Single().Execute()
-	var character *Character
-	json.Unmarshal(data, character)
+	var character Character
+	json.Unmarshal(data, &character)
 	return character, err
 }
 
@@ -81,11 +88,13 @@ func (db CharacterTable) Create(character CreateCharacterPayload) (*Character, e
 	return &result, err
 }
 
-func (db CharacterTable) Update(character UpdateCharacterPayload) (*Character, error) {
-	data, _, err := db.client.From("characters").Insert(character, true, "", "", "exact").Execute()
-	var result *Character
-	json.Unmarshal(data, result)
-	return result, err
+func (db CharacterTable) Update(character UpdateCharacterPayload) (Character, error) {
+	_, _, err := db.client.From("characters").Insert(character, true, "", "", "exact").Execute()
+	if err != nil {
+		slog.Error("Error updating character", "error", err)
+		return Character{}, err
+	}
+	return db.Get(character.Id)
 }
 
 func (db CharacterTable) Delete(id string) error {
@@ -93,8 +102,8 @@ func (db CharacterTable) Delete(id string) error {
 	return err
 }
 
-func (db CharacterTable) GetRevealedFields(id string) (CharacterReveleadFields, error) {
-	data, _, err := db.client.From("actions").Select("*", "exact", false).Filter("character_id", "eq", id).Single().Execute()
+func (db CharacterTable) GetRevealedFields(character_id string) (CharacterReveleadFields, error) {
+	data, _, err := db.client.From("character_revealed_fields").Select("*", "exact", false).Filter("character_id", "eq", character_id).Single().Execute()
 	var revealedFields CharacterReveleadFields
 	json.Unmarshal(data, &revealedFields)
 	return revealedFields, err

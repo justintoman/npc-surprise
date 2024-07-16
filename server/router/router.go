@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"log/slog"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +22,7 @@ type Router struct {
 }
 
 func New(db db.Db, adminKey string) *gin.Engine {
-	streamService := stream.New()
+	streamService := stream.New(db)
 
 	router := Router{stream: streamService, db: db, AdminKey: adminKey}
 
@@ -34,21 +33,24 @@ func New(db db.Db, adminKey string) *gin.Engine {
 
 	adminRoutes := g.Group("/")
 	adminRoutes.Use(router.AdminMiddleware)
-	adminRoutes.GET("/players", tonic.Handler(router.GetPlayers, 200))
+	adminRoutes.GET("players", tonic.Handler(router.GetPlayers, 200))
+	adminRoutes.DELETE("players/:id", tonic.Handler(router.DeletePlayer, 200))
 
 	assignRoutes := adminRoutes.Group("/assign")
-	assignRoutes.POST("/assign", tonic.Handler(router.AssignToPlayer, 200))
-	assignRoutes.DELETE("/assign", tonic.Handler(router.UnassignFromPlayer, 200))
+	assignRoutes.POST("", tonic.Handler(router.AssignToPlayer, 200))
+	assignRoutes.DELETE("", tonic.Handler(router.UnassignFromPlayer, 200))
 
 	characterRoutes := adminRoutes.Group("/characters")
-	characterRoutes.GET("/", tonic.Handler(router.GetCharacters, 200))
-	characterRoutes.POST("/", tonic.Handler(router.CreateCharacter, 200))
+	characterRoutes.GET("", tonic.Handler(router.GetCharacters, 200))
+	characterRoutes.POST("", tonic.Handler(router.CreateCharacter, 200))
 	characterRoutes.PUT("/:id", tonic.Handler(router.UpdateCharacter, 200))
 	characterRoutes.PUT("/:id/reveal", tonic.Handler(router.UpdateRevealedFields, 200))
+	characterRoutes.DELETE("/:id", tonic.Handler(router.DeleteCharacter, 200))
 
 	actionRoutes := adminRoutes.Group("/actions")
-	actionRoutes.POST("/", tonic.Handler(router.CreateAction, 200))
-	actionRoutes.PUT("/:id", tonic.Handler(router.UpdateAction, 200))
+	actionRoutes.POST("", tonic.Handler(router.CreateAction, 200))
+	actionRoutes.PUT(":id", tonic.Handler(router.UpdateAction, 200))
+	actionRoutes.DELETE(":id", tonic.Handler(router.DeleteAction, 200))
 
 	authRoutes := g.Group("/")
 
@@ -62,7 +64,10 @@ func New(db db.Db, adminKey string) *gin.Engine {
 }
 
 func (r Router) AdminMiddleware(c *gin.Context) {
-	requestKey := c.Request.Header.Get("X-Npc-Surprise-Admin-Key")
+	requestKey, err := c.Cookie("admin_key")
+	if err != nil {
+		requestKey = ""
+	}
 
 	if requestKey != r.AdminKey {
 		c.AbortWithStatusJSON(401, ErrorResponse{Message: "Unauthorized. You are not Justin.", Status: 401})
@@ -73,7 +78,6 @@ func (r Router) AdminMiddleware(c *gin.Context) {
 }
 
 func (r Router) Status(c *gin.Context) error {
-	requestKey := c.Request.Header.Get("X-Npc-Surprise-Admin-Key")
 	playerName, err := c.Cookie("player_name")
 	if err != nil {
 		playerName = ""
@@ -83,6 +87,10 @@ func (r Router) Status(c *gin.Context) error {
 		playerId = ""
 	}
 
+	requestKey, err := c.Cookie("admin_key")
+	if err != nil {
+		requestKey = ""
+	}
 	isAdmin := requestKey == r.AdminKey && requestKey != ""
 	response := StatusResponse{
 		PlayerId:   playerId,

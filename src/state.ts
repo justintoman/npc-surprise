@@ -1,5 +1,5 @@
 import { atom, createStore } from 'jotai';
-import { atomFamily, atomWithRefresh } from 'jotai/utils';
+import { atomWithRefresh } from 'jotai/utils';
 import { NpcSurpriseApi } from '~/api';
 import { Action, Character, Player } from '~/types';
 
@@ -19,6 +19,7 @@ export function initStream() {
 
   eventSource.onerror = (e) => {
     console.error(e);
+    store.set(statusAtom);
   };
 
   return function close() {
@@ -36,13 +37,8 @@ type AssignCharacterMessage = {
   data: Character;
 };
 
-type UnassignActionMessage = {
-  type: 'unassign-action';
-  data: number; // id
-};
-
-type UnassignCharacterMessage = {
-  type: 'unassign-character';
+type UnassignMessage = {
+  type: 'unassign-action' | 'unassign-character';
   data: number; // id
 };
 
@@ -53,57 +49,138 @@ type CharacterMessage = {
 
 type ConnectedMessage = {
   type: 'connected';
-  data: null;
+  data: {
+    players: Player[];
+    characters: Character[];
+  };
+};
+
+type PlayerDeletedMessage = {
+  type: 'player-deleted';
+  data: number;
+};
+
+type PlayerConnectedMessage = {
+  type: 'player-connected';
+  data: Player;
+};
+
+type PlayerDisconnectedMessage = {
+  type: 'player-disconnected';
+  data: number; // player id
 };
 
 type Message =
   | AssignActionMessage
   | AssignCharacterMessage
-  | UnassignActionMessage
-  | UnassignCharacterMessage
+  | UnassignMessage
   | CharacterMessage
-  | ConnectedMessage;
+  | ConnectedMessage
+  | PlayerConnectedMessage
+  | PlayerDisconnectedMessage
+  | PlayerDeletedMessage;
 
 function handleEvents(message: Message) {
   switch (message.type) {
     case 'assign-action': {
-      const actions = store.get(actionsAtom);
-      store.set(actionsAtom, [...actions, message.data]);
+      const characters = store.get(charactersAtomInternal);
+      const character = characters.find(
+        (char) => char.id === message.data.character_id,
+      );
+      if (!character) {
+        return;
+      }
+
+      store.set(
+        charactersAtomInternal,
+        characters.map((char) =>
+          char === character
+            ? { ...character, actions: [...character.actions, message.data] }
+            : char,
+        ),
+      );
       break;
     }
     case 'assign-character': {
-      const characters = store.get(assignedCharactersAtom);
-      store.set(assignedCharactersAtom, [...characters, message.data]);
+      const characters = store.get(charactersAtomInternal);
+      store.set(charactersAtomInternal, [...characters, message.data]);
       break;
     }
     case 'unassign-action': {
-      const actions = store.get(actionsAtom);
+      const characters = store.get(charactersAtomInternal);
+      const character = characters.find((char) =>
+        char.actions.some((a) => a.id === message.data),
+      );
+      if (!character) {
+        return;
+      }
+
       store.set(
-        actionsAtom,
-        actions.filter((action) => action.id !== message.data),
+        charactersAtomInternal,
+        characters.map((char) =>
+          char === character
+            ? {
+                ...character,
+                actions: character.actions.filter((a) => a.id !== message.data),
+              }
+            : char,
+        ),
       );
       break;
     }
     case 'unassign-character': {
-      const characters = store.get(assignedCharactersAtom);
+      const characters = store.get(charactersAtomInternal);
       store.set(
-        assignedCharactersAtom,
+        charactersAtomInternal,
         characters.filter((char) => char.id !== message.data),
       );
       break;
     }
     case 'character': {
-      const characters = store.get(assignedCharactersAtom);
+      const characters = store.get(charactersAtomInternal);
+      const exists = characters.some((char) => char.id === message.data.id);
       store.set(
-        assignedCharactersAtom,
-        characters.map((char) =>
-          char.id === message.data.id ? message.data : char,
-        ),
+        charactersAtomInternal,
+        exists
+          ? characters.map((char) =>
+              char.id === message.data.id ? message.data : char,
+            )
+          : [...characters, message.data],
       );
       break;
     }
     case 'connected': {
-      console.log('connected');
+      store.set(playersAtomInternal, message.data.players);
+      store.set(charactersAtomInternal, message.data.characters);
+      break;
+    }
+    case 'player-connected': {
+      const players = store.get(playersAtomInternal);
+      const exists = players.some((p) => p.id === message.data.id);
+      store.set(
+        playersAtomInternal,
+        exists
+          ? players.map((p) => (p.id === message.data.id ? message.data : p))
+          : [...players, { ...message.data, is_online: true }],
+      );
+      break;
+    }
+    case 'player-disconnected': {
+      const players = store.get(playersAtomInternal);
+      store.set(
+        playersAtomInternal,
+        players.map((player) =>
+          player.id === message.data ? { ...player, is_online: false } : player,
+        ),
+      );
+      break;
+    }
+    case 'player-deleted': {
+      const players = store.get(playersAtomInternal);
+      store.set(
+        playersAtomInternal,
+        players.filter((player) => player.id !== message.data),
+      );
       break;
     }
     default: {
@@ -112,28 +189,14 @@ function handleEvents(message: Message) {
   }
 }
 
-export const playersAtom = atom<Player[]>([]);
+const playersAtomInternal = atom<Player[]>([]);
+export const playersAtom = atom<Player[]>((get) => get(playersAtomInternal));
 
-export const allCharactersAtom = atom<Array<Character & { actions: Action[] }>>(
-  [],
-);
-
-export const assignedCharactersAtom = atom<Character[]>([]);
-
-export const playerAtom = atom<Player | null>(null);
-
-export const actionsAtom = atom<Action[]>([]);
-
-export const characterActions = atomFamily((characterId: number) =>
-  atom((get) => {
-    return get(actionsAtom).filter(
-      (action) => action.character_id === characterId,
-    );
-  }),
+const charactersAtomInternal = atom<Character[]>([]);
+export const charactersAtom = atom<Character[]>((get) =>
+  get(charactersAtomInternal),
 );
 
 export const statusAtom = atomWithRefresh(async () => {
   return NpcSurpriseApi.status();
 });
-
-export const currentPlayerAtom = atom<Omit<Player, 'is_online'> | null>(null);

@@ -14,6 +14,7 @@ export type Character = {
   age: string;
   description: string;
   appearance: string;
+  actions: Action[];
 };
 
 export type Action = {

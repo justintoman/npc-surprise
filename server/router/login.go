@@ -12,6 +12,14 @@ type NameInput struct {
 }
 
 func (r Router) Login(c *gin.Context, input *NameInput) error {
+
+	if input.Name == r.AdminKey {
+		c.SetCookie("player_id", "admin", 0, "/", "", false, true)
+		c.SetCookie("player_name", "Admin", 0, "/", "", false, true)
+		c.SetCookie("admin_key", input.Name, 0, "/", "", false, true)
+		return nil
+	}
+
 	playerIdStr, err := c.Cookie("player_id")
 	if err != nil {
 		// need to create a new player
