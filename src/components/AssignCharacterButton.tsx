@@ -11,23 +11,22 @@ import { playersAtom } from '~/state';
 
 type Props = {
   id: number;
-  type: 'action' | 'character';
 };
 
-export function AssignButton({ id, type }: Props) {
+export function AssignCharacterButton({ id }: Props) {
   const players = useAtomValue(playersAtom);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="secondary">
-          {type === 'character' ? 'Assign' : 'Reveal'}
+        <Button size="sm" variant="secondary">
+          Assign
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {players.map((player) => (
           <DropdownMenuItem
             key={player.id}
-            onClick={() => NpcSurpriseApi.assign(type, id, player.id)}
+            onClick={() => NpcSurpriseApi.assign('character', id, player.id)}
           >
             {player.name}
           </DropdownMenuItem>

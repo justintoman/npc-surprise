@@ -155,10 +155,16 @@ func redactCharacter(character *db.Character, revealedFields db.CharacterRevelea
 	if !revealedFields.Appearance {
 		character.Appearance = ""
 	}
-	return
 }
 
 func (r Router) DeleteCharacter(c *gin.Context) error {
 	id := c.Params.ByName("id")
-	return r.db.Character.Delete(id)
+	err := r.db.Character.Delete(id)
+	if err != nil {
+		slog.Error("Error deleting character", "error", err)
+		return err
+	}
+
+	r.stream.SendMessage("admin", stream.MessagePayload{Type: "delete-character", Data: id})
+	return nil
 }

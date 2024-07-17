@@ -20,6 +20,7 @@ export type Character = {
 export type Action = {
   id: number;
   character_id: number;
+  player_id?: number;
   type: string;
   content: string;
   direction: string;

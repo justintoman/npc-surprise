@@ -1,92 +1,58 @@
 import { useAtomValue } from 'jotai';
-import { Plus, X } from 'lucide-react';
+import { PlusCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { ActionForm } from '~/AdminView/ActionForm';
 import { CharacterForm } from '~/AdminView/CharacterForm';
 import { NpcSurpriseApi } from '~/api';
 import { Character } from '~/components/Character';
 import { Button } from '~/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+} from '~/components/ui/dialog';
+import { getNewCharacter } from '~/lib/utils';
 import { charactersAtom, initStream, playersAtom } from '~/state';
-import { Action, Character as CharacterType } from '~/types';
 
 export function AdminView() {
   const characters = useAtomValue(charactersAtom);
-
-  const [characterId, setCharacterId] = useState<number | 'new' | null>(null);
-  const [actionId, setActionId] = useState<number | 'new' | null>(null);
+  const [isAddingCharacter, setIsAddingCharacter] = useState(false);
 
   useEffect(() => {
     return initStream();
   }, []);
 
-  if (characterId !== null) {
-    const defaultValues =
-      characters.find((c) => c.id === characterId) ?? getNewCharacter();
-    return (
-      <CharacterForm
-        id={typeof characterId === 'number' ? characterId : undefined}
-        defaultValues={defaultValues}
-        onClose={() => setCharacterId(null)}
-      />
-    );
-  }
-  if (typeof characterId === 'number' && actionId !== null) {
-    const defaultValues =
-      characters
-        .find((c) => c.id === characterId)
-        ?.actions.find((a) => a.id === actionId) ?? getNewAction();
-    return (
-      <ActionForm
-        id={typeof actionId === 'number' ? actionId : undefined}
-        defaultValues={defaultValues}
-        character_id={characterId}
-        onClose={() => setActionId(null)}
-      />
-    );
-  }
-
   return (
     <div className="flex">
       <div className="grow space-y-4">
+        <header className="flex items-center space-x-4">
+          <h2 className="text-lg font-bold">Characters</h2>
+          <Dialog open={isAddingCharacter} onOpenChange={setIsAddingCharacter}>
+            <DialogTrigger asChild>
+              <Button size="icon">
+                <PlusCircle className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>Add Character</DialogHeader>
+              <CharacterForm
+                defaultValues={getNewCharacter()}
+                onClose={() => setIsAddingCharacter(false)}
+              />
+            </DialogContent>
+          </Dialog>
+        </header>
         <ul>
-          <h2>Characters</h2>
-          <Button onClick={() => setCharacterId('new')}>
-            Add Character <Plus />
-          </Button>
-          <ul>
-            {characters.map((char) => (
-              <li key={char.id}>
-                <Character
-                  character={char}
-                  onEdit={(id: number) => setCharacterId(id)}
-                />
-              </li>
-            ))}
-          </ul>
+          {characters.map((char) => (
+            <li key={char.id}>
+              <Character character={char} />
+            </li>
+          ))}
         </ul>
       </div>
       <PlayersList />
     </div>
   );
-}
-
-function getNewCharacter(): Omit<CharacterType, 'id' | 'actions'> {
-  return {
-    name: '',
-    race: '',
-    gender: '',
-    age: '',
-    description: '',
-    appearance: '',
-  };
-}
-
-function getNewAction(): Omit<Action, 'id' | 'character_id'> {
-  return {
-    type: '',
-    direction: '',
-    content: '',
-  };
 }
 
 function PlayersList() {

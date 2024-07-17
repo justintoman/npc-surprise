@@ -1,5 +1,5 @@
 import { atom, createStore } from 'jotai';
-import { atomWithRefresh } from 'jotai/utils';
+import { atomWithRefresh, loadable } from 'jotai/utils';
 import { NpcSurpriseApi } from '~/api';
 import { Action, Character, Player } from '~/types';
 
@@ -47,17 +47,17 @@ type CharacterMessage = {
   data: Character;
 };
 
+type ActionMessage = {
+  type: 'action';
+  data: Action;
+};
+
 type ConnectedMessage = {
   type: 'connected';
   data: {
     players: Player[];
     characters: Character[];
   };
-};
-
-type PlayerDeletedMessage = {
-  type: 'player-deleted';
-  data: number;
 };
 
 type PlayerConnectedMessage = {
@@ -70,15 +70,21 @@ type PlayerDisconnectedMessage = {
   data: number; // player id
 };
 
+type DeleteMessage = {
+  type: 'delete-action' | 'delete-character' | 'delete-player';
+  data: number;
+};
+
 type Message =
   | AssignActionMessage
   | AssignCharacterMessage
   | UnassignMessage
   | CharacterMessage
+  | ActionMessage
   | ConnectedMessage
   | PlayerConnectedMessage
   | PlayerDisconnectedMessage
-  | PlayerDeletedMessage;
+  | DeleteMessage;
 
 function handleEvents(message: Message) {
   switch (message.type) {
@@ -149,6 +155,19 @@ function handleEvents(message: Message) {
       );
       break;
     }
+    case 'action': {
+      const characters = store.get(charactersAtomInternal);
+      store.set(
+        charactersAtomInternal,
+        characters.map((character) => ({
+          ...character,
+          actions: character.actions.map((a) =>
+            a.id === message.data.id ? message.data : a,
+          ),
+        })),
+      );
+      break;
+    }
     case 'connected': {
       store.set(playersAtomInternal, message.data.players);
       store.set(charactersAtomInternal, message.data.characters);
@@ -175,11 +194,22 @@ function handleEvents(message: Message) {
       );
       break;
     }
-    case 'player-deleted': {
-      const players = store.get(playersAtomInternal);
+    case 'delete-action': {
+      const characters = store.get(charactersAtomInternal);
       store.set(
-        playersAtomInternal,
-        players.filter((player) => player.id !== message.data),
+        charactersAtomInternal,
+        characters.map((char) => ({
+          ...char,
+          actions: char.actions.filter((a) => a.id !== message.data),
+        })),
+      );
+      break;
+    }
+    case 'delete-character': {
+      const characters = store.get(charactersAtomInternal);
+      store.set(
+        charactersAtomInternal,
+        characters.filter((char) => char.id !== message.data),
       );
       break;
     }
@@ -199,4 +229,9 @@ export const charactersAtom = atom<Character[]>((get) =>
 
 export const statusAtom = atomWithRefresh(async () => {
   return NpcSurpriseApi.status();
+});
+
+export const isAdminAtom = atom((get) => {
+  const loaded = get(loadable(statusAtom));
+  return loaded.state === 'hasData' && loaded.data.is_admin;
 });

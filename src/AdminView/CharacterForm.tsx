@@ -38,7 +38,7 @@ export function CharacterForm({ id, defaultValues, onClose }: Props) {
 
   return (
     <Form {...methods}>
-      <form onSubmit={methods.handleSubmit(submit)}>
+      <form onSubmit={methods.handleSubmit(submit)} className="space-y-4">
         <FormField
           control={methods.control}
           name="name"
@@ -117,10 +117,12 @@ export function CharacterForm({ id, defaultValues, onClose }: Props) {
             </FormItem>
           )}
         />
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit">Submit</Button>
+        <div className="mt-8 flex justify-end space-x-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit">Submit</Button>
+        </div>
       </form>
     </Form>
   );

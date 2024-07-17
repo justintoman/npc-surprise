@@ -18,7 +18,7 @@ type UpdateActionPayload struct {
 type Action struct {
 	ActionBase
 	Id       int `json:"id"`
-	PlayerId int `json:"player_id"`
+	PlayerId int `json:"player_id,omitempty"`
 }
 
 type ActionBase struct {
@@ -61,7 +61,7 @@ func (db ActionTable) Create(action CreateActionPayload) (Action, error) {
 }
 
 func (db ActionTable) Update(action UpdateActionPayload) (Action, error) {
-	data, _, err := db.client.From("actions").Insert(action, true, "", "", "exact").Execute()
+	data, _, err := db.client.From("actions").Insert(action, true, "", "", "exact").Single().Execute()
 	var result Action
 	json.Unmarshal(data, &result)
 	return result, err

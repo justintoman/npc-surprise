@@ -213,6 +213,6 @@ func (r *Router) DeletePlayer(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	r.stream.SendMessage("admin", stream.MessagePayload{Type: "player-deleted", Data: idInt})
+	r.stream.SendMessage("admin", stream.MessagePayload{Type: "delete-player", Data: idInt})
 	return nil
 }
