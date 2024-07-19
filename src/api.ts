@@ -1,14 +1,14 @@
 import ky from 'ky';
-import { Action, Character, CurrentPlayer, Player } from '~/types';
+import { Action, Character, Player } from '~/types';
 
 const client = ky.create({
   prefixUrl: '/api',
 });
 
 export const NpcSurpriseApi = {
-  login(name: string): Promise<CurrentPlayer> {
+  login(name: string): Promise<Required<StatusResponse>> {
     const response = client.post('login', { json: { name: name } });
-    return response.json<Player>();
+    return response.json();
   },
   getPlayers(): Promise<Player[]> {
     return client.get('players').json<Player[]>();
@@ -47,8 +47,8 @@ export const NpcSurpriseApi = {
     return client.delete(`actions/${id}`).json();
   },
 
-  assign(type: 'action' | 'character', id: number, player_id: number) {
-    return client.post('assign', { json: { id, player_id, type } }).json();
+  assign(type: 'action' | 'character', id: number, playerId: number) {
+    return client.post('assign', { json: { id, playerId, type } }).json();
   },
 
   deletePlayer(id: number): Promise<void> {
@@ -56,8 +56,8 @@ export const NpcSurpriseApi = {
   },
 };
 
-type StatusResponse = {
-  is_admin: boolean;
-  player_id?: string;
-  player_name?: string;
+export type StatusResponse = {
+  isAdmin: boolean;
+  playerId?: string;
+  playerName?: string;
 };

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/justintoman/npc-surprise/db"
@@ -15,26 +14,34 @@ import (
 // https://github.com/gin-gonic/examples/blob/master/server-sent-event/main.go
 
 type StreamingServer interface {
-	NewUserStream() (gin.HandlerFunc, StreamHandlerFunc)
+	NewUserStream(onAdd OnClientAddedFunc, onRemove OnClientRemovedFunc) (gin.HandlerFunc, StreamHandlerFunc)
 	Close(ClientChan)
-	SendMessage(clientId string, message MessagePayload)
 	Listen(context.Context)
-	GetClients() []UserClient
-}
+	GetClients() []db.Player
 
-type UserClient struct {
-	IsAdmin bool   `json:"is_admin"`
-	Id      string `json:"id"`
-	Name    string `json:"name"`
+	// messages
+	// SendAssignActionMessage(action db.Action)
+	// SendAssignCharacterMessage(character db.CharacterWithActions)
+	SendUnassignActionMessage(playerId int, actionId int)
+	SendUnassignCharacterMessage(playerId int, characterId int)
+	SendAdminCharacterMessage(character db.CharacterWithActions)
+	SendPlayerCharacterMessage(character db.CharacterWithActions)
+	SendActionMessage(action db.Action)
+	SendInitMessage(playerId int, characters []db.CharacterWithActions)
+	SendInitAdminMessage(players []db.Player, characters []db.CharacterWithActions)
+	SendPlayerConnectedMessage(player db.Player)
+	SendPlayerDisconnectedMessage(playerId int)
+	SendDeleteCharacterMessage(characterId int)
+	SendDeleteActionMessage(actionId int)
+	SendDeletePlayerMessage(playerId int)
 }
 
 func New(db db.Db) StreamingServer {
 	eventStream := &EventStream{
-		Db:            db,
 		Message:       make(chan Message),
 		NewClients:    make(chan ClientChan),
 		ClosedClients: make(chan ClientChan),
-		TotalClients:  make(map[string]ClientChan),
+		TotalClients:  make(map[int]ClientChan),
 	}
 	return eventStream
 }
@@ -43,32 +50,36 @@ func (stream *EventStream) Close(clientChan ClientChan) {
 	stream.ClosedClients <- clientChan
 }
 
-func (stream *EventStream) SendMessage(clientId string, message MessagePayload) {
-	slog.Info("Sending message", "clientId", clientId, "message", message)
-	stream.Message <- Message{PlayerId: clientId, Payload: message}
+func (stream *EventStream) sendMessage(playerId int, message any) {
+	slog.Info("Sending message", "clientId", playerId, "message", message)
+	stream.Message <- Message{PlayerId: playerId, Payload: message}
 }
 
-func (stream *EventStream) GetClients() []UserClient {
-	clients := make([]UserClient, 0, len(stream.TotalClients))
+func (stream *EventStream) sendAdminMessage(message any) {
+	if _, ok := stream.TotalClients[AdminPlayerId]; !ok {
+		slog.Info("no admin connected, skipping message", "message", message)
+		return
+	}
+
+	stream.sendMessage(AdminPlayerId, message)
+}
+
+func (stream *EventStream) GetClients() []db.Player {
+	clients := make([]db.Player, 0, len(stream.TotalClients))
 	for _, client := range stream.TotalClients {
-		clients = append(clients, client.UserClient)
+		clients = append(clients, client.Player)
 	}
 	return clients
 }
 
 type ClientChan struct {
-	UserClient
-	Channel chan MessagePayload
+	db.Player
+	Channel chan any
 }
 
 type Message struct {
-	PlayerId string
-	Payload  MessagePayload
-}
-
-type MessagePayload struct {
-	Type string `json:"type"`
-	Data any    `json:"data"`
+	PlayerId int
+	Payload  any
 }
 
 type EventStream struct {
@@ -77,7 +88,7 @@ type EventStream struct {
 	NewClients    chan ClientChan
 	ClosedClients chan ClientChan
 	// map of clients by string topic
-	TotalClients map[string]ClientChan
+	TotalClients map[int]ClientChan
 }
 
 func (stream *EventStream) Listen(c context.Context) {
@@ -85,29 +96,7 @@ func (stream *EventStream) Listen(c context.Context) {
 		select {
 		// Add new available client
 		case client := <-stream.NewClients:
-			if client.IsAdmin {
-				stream.TotalClients["admin"] = client
-				stream.sendAdminConnectedData(client.Channel)
-			} else {
-				stream.TotalClients[client.Id] = client
-				stream.sendPlayerConnectedData(client.Id)
-				admin, ok := stream.TotalClients["admin"]
-				if !ok {
-					slog.Error("Could not find admin client")
-					continue
-				}
-				type PlayerConnectedPayload struct {
-					Id       int    `json:"id"`
-					Name     string `json:"name"`
-					IsOnline bool   `json:"is_online"`
-				}
-				id, err := strconv.Atoi(client.Id)
-				if err != nil {
-					slog.Error("Could not convert player id to int", "error", err)
-					continue
-				}
-				admin.Channel <- MessagePayload{Type: "player-connected", Data: PlayerConnectedPayload{Id: id, Name: client.Name, IsOnline: true}}
-			}
+			stream.TotalClients[client.Id] = client
 			names := make([]string, 0)
 			for _, client := range stream.TotalClients {
 				names = append(names, client.Name)
@@ -117,32 +106,15 @@ func (stream *EventStream) Listen(c context.Context) {
 		// Remove closed client
 		case client := <-stream.ClosedClients:
 			slog.Info("Client closed", "id", client.Id)
-			if client.IsAdmin {
-				delete(stream.TotalClients, "admin")
-				continue
-			}
 			delete(stream.TotalClients, client.Id)
 			close(client.Channel)
-
-			// tell the admin a user left
-			admin, ok := stream.TotalClients["admin"]
-			if !ok {
-				// no admin client connected
-				continue
-			}
-			playerId, err := strconv.Atoi(client.UserClient.Id)
-			if err != nil {
-				slog.Error("Could not convert player id to int", "error", err)
-				continue
-			}
-			admin.Channel <- MessagePayload{Type: "player-disconnected", Data: playerId}
 			slog.Info(fmt.Sprintf("Removed client. %d registered clients", len(stream.TotalClients)))
 
 		// Broadcast message to client
 		case eventMsg := <-stream.Message:
 			client, ok := stream.TotalClients[eventMsg.PlayerId]
 			if !ok {
-				slog.Error(fmt.Sprintf("Attempted to send message to a client that doesn't exist. Id: %s", eventMsg.PlayerId))
+				slog.Error(fmt.Sprintf("Attempted to send message to a client that doesn't exist. Id: %d", eventMsg.PlayerId))
 				continue
 			}
 
@@ -155,40 +127,33 @@ func (stream *EventStream) Listen(c context.Context) {
 
 type StreamHandlerFunc func(*gin.Context) (bool, error)
 
-func (stream *EventStream) NewUserStream() (gin.HandlerFunc, StreamHandlerFunc) {
+type OnClientAddedFunc func(db.Player)
+type OnClientRemovedFunc func(db.Player)
+
+func (stream *EventStream) NewUserStream(onAdded OnClientAddedFunc, onRemoved OnClientRemovedFunc) (gin.HandlerFunc, StreamHandlerFunc) {
 	middleware := func(c *gin.Context) {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 		c.Writer.Header().Set("Connection", "keep-alive")
 		c.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-		id, err := c.Cookie("player_id")
+		player := c.MustGet("player").(db.Player)
 
-		if err != nil {
-			c.AbortWithStatusJSON(400, gin.H{"message": "Missing player_id cookie", "status": 400})
-			return
-		}
-
-		name, err := c.Cookie("player_name")
-		if err != nil {
-			c.AbortWithStatusJSON(400, gin.H{"message": "Missing player_id cookie", "status": 400})
-			return
-		}
-
-		isAdmin := c.MustGet("isAdmin").(bool)
 		clientChan := ClientChan{
-			Channel: make(chan MessagePayload),
-			UserClient: UserClient{
-				IsAdmin: isAdmin,
-				Id:      id,
-				Name:    name,
+			Channel: make(chan any),
+			Player: db.Player{
+				Id:   player.Id,
+				Name: player.Name,
 			},
 		}
 		stream.NewClients <- clientChan
 
+		onAdded(player)
+
 		go func() {
 			<-c.Writer.CloseNotify()
 			stream.Close(clientChan)
+			onRemoved(player)
 		}()
 
 		c.Set("clientChan", clientChan)
@@ -214,93 +179,4 @@ func (stream *EventStream) NewUserStream() (gin.HandlerFunc, StreamHandlerFunc) 
 		return true, nil
 	}
 	return middleware, handler
-}
-
-func (stream *EventStream) sendPlayerConnectedData(player_id string) error {
-	client, ok := stream.TotalClients[player_id]
-	if !ok {
-		return fmt.Errorf("client not found for player_id %s", player_id)
-	}
-
-	characters, err := stream.Db.Character.GetAllByPlayerId(player_id)
-	if err != nil {
-		return err
-	}
-
-	charsWithActions := make([]map[string]any, len(characters))
-	for i, character := range characters {
-		actions, err := stream.Db.Action.GetAll(character.Id)
-		if err != nil {
-			return err
-		}
-		charsWithActions[i] = map[string]any{
-			"id":          character.Id,
-			"name":        character.Name,
-			"race":        character.Race,
-			"gender":      character.Gender,
-			"age":         character.Age,
-			"description": character.Description,
-			"appearance":  character.Appearance,
-			"actions":     actions,
-		}
-	}
-	client.Channel <- MessagePayload{Type: "connected", Data: map[string]any{
-		"players":    make([]map[string]any, 0),
-		"characters": charsWithActions,
-	}}
-	return nil
-}
-
-func (stream *EventStream) sendAdminConnectedData(channel chan MessagePayload) error {
-
-	characters, err := stream.Db.Character.GetAll()
-	if err != nil {
-		return err
-	}
-
-	charsWithActions := make([]map[string]any, len(characters))
-	for i, character := range characters {
-		actions, err := stream.Db.Action.GetAll(character.Id)
-		if err != nil {
-			return err
-		}
-		charsWithActions[i] = map[string]any{
-			"id":          character.Id,
-			"name":        character.Name,
-			"race":        character.Race,
-			"gender":      character.Gender,
-			"age":         character.Age,
-			"description": character.Description,
-			"appearance":  character.Appearance,
-			"actions":     actions,
-		}
-	}
-	dbPlayers, err := stream.Db.Player.GetAll()
-	if err != nil {
-		return err
-	}
-	onlinePlayers := stream.GetClients()
-
-	type PlayerResponse struct {
-		db.Player
-		IsOnline bool `json:"is_online"`
-	}
-
-	result := make([]PlayerResponse, len(*dbPlayers))
-	for i, player := range *dbPlayers {
-		result[i] = PlayerResponse{Player: player}
-		for _, onlinePlayer := range onlinePlayers {
-			if result[i].IsOnline {
-				continue
-			}
-			if strconv.Itoa(player.Id) == onlinePlayer.Id {
-				result[i].IsOnline = true
-			}
-		}
-	}
-	channel <- MessagePayload{Type: "connected", Data: map[string]any{
-		"players":    result,
-		"characters": charsWithActions,
-	}}
-	return nil
 }

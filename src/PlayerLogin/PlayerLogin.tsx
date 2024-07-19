@@ -2,13 +2,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useSetAtom } from 'jotai';
 import { Check } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { NpcSurpriseApi } from '~/api';
 import { Button } from '~/components/ui/button';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -17,19 +17,25 @@ import {
 import { Input } from '~/components/ui/input';
 import { statusAtom } from '~/state';
 
-export function PlayerLogin({ name }: { name: string }) {
+export function PlayerLogin({ name }: { name?: string }) {
   const methods = useForm<LoginForm>({
     resolver: zodResolver(schema),
     defaultValues: { name },
   });
-  const refreshStatus = useSetAtom(statusAtom);
+  const setStatus = useSetAtom(statusAtom);
+  const navigate = useNavigate();
   async function submit({ name }: LoginForm) {
     try {
-      await NpcSurpriseApi.login(name);
+      const status = await NpcSurpriseApi.login(name);
+      setStatus(status);
+      if (status.isAdmin) {
+        navigate('/admin');
+      } else {
+        navigate('/player');
+      }
     } catch (error) {
       console.error(error);
     }
-    refreshStatus();
   }
 
   return (
@@ -43,15 +49,12 @@ export function PlayerLogin({ name }: { name: string }) {
               <FormLabel>Player Name</FormLabel>
               <div className="flex items-center space-x-2">
                 <FormControl>
-                  <Input placeholder="Put yer name here" {...field} />
+                  <Input {...field} />
                 </FormControl>
                 <Button type="submit" size="icon" className="shrink-0">
                   <Check className="h-4 w-4" />
                 </Button>
               </div>
-              <FormDescription>
-                Only Justin will be able to see this for now.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

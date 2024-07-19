@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function getNewAction(): Omit<Action, 'id' | 'character_id'> {
+export function getNewAction(): Omit<Action, 'id' | 'characterId'> {
   return {
     type: '',
     direction: '',

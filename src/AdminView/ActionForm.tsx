@@ -14,13 +14,13 @@ import {
 import { Input } from '~/components/ui/input';
 
 type Props = {
-  character_id: number;
+  characterId: number;
   id?: number;
   defaultValues?: ActionFormInput;
   onClose(): void;
 };
 
-export function ActionForm({ id, character_id, defaultValues, onClose }: Props) {
+export function ActionForm({ id, characterId, defaultValues, onClose }: Props) {
   const methods = useForm<ActionFormInput>({
     resolver: zodResolver(schema),
     defaultValues,
@@ -28,9 +28,9 @@ export function ActionForm({ id, character_id, defaultValues, onClose }: Props) 
 
   async function submit(data: ActionFormInput) {
     if (id) {
-      await NpcSurpriseApi.updateAction({ id, character_id, ...data });
+      await NpcSurpriseApi.updateAction({ id, characterId, ...data });
     } else {
-      await NpcSurpriseApi.createAction({ character_id, ...data });
+      await NpcSurpriseApi.createAction({ characterId, ...data });
     }
 
     onClose();
@@ -78,7 +78,9 @@ export function ActionForm({ id, character_id, defaultValues, onClose }: Props) 
             </FormItem>
           )}
         />
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
         <Button type="submit">Submit</Button>
       </form>
     </Form>

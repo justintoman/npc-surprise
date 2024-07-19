@@ -4,8 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/supabase-community/postgrest-go"
 	"github.com/supabase-community/supabase-go"
 )
+
+type CreatePlayerPayload struct {
+	Name string `json:"name"`
+}
 
 type Player struct {
 	Id   int    `json:"id"`
@@ -16,22 +21,26 @@ type PlayerTable struct {
 	client *supabase.Client
 }
 
-func (db PlayerTable) GetAll() (*[]Player, error) {
-	data, _, err := db.client.From("players").Select("*", "exact", false).Execute()
+func (db PlayerTable) GetAll() ([]Player, error) {
+	query := selectAll(db.from())
+	data, _, err := query.Execute()
 	var players []Player
 	json.Unmarshal(data, &players)
-	return &players, err
+	return players, err
 }
 
-func (db PlayerTable) Get(id string) (Player, error) {
-	data, _, err := db.client.From("players").Select("*", "exact", false).Filter("id", "eq", id).Single().Execute()
+func (db PlayerTable) Get(id int) (Player, error) {
+	query := selectAll(db.from())
+	query = filterById(query, id)
+	data, _, err := query.Execute()
 	var player Player
 	json.Unmarshal(data, &player)
 	return player, err
 }
 
-func (db PlayerTable) Create(name string) (Player, error) {
-	data, _, err := db.client.From("players").Insert(map[string]any{"name": name}, true, "", "", "exact").Single().Execute()
+func (db PlayerTable) Create(payload CreatePlayerPayload) (Player, error) {
+	query := insertSingle(db.from(), payload).Single()
+	data, _, err := query.Execute()
 	var result Player
 	json.Unmarshal(data, &result)
 	fmt.Println("create player", result)
@@ -39,31 +48,21 @@ func (db PlayerTable) Create(name string) (Player, error) {
 }
 
 func (db PlayerTable) Update(player Player) (Player, error) {
-	data, _, err := db.client.From("players").Insert(player, true, "", "", "exact").Single().Execute()
+	query := insertSingle(db.from(), player).Single()
+	data, _, err := query.Execute()
 	var result Player
-	var mapthing map[string]any
 	json.Unmarshal(data, &result)
-	json.Unmarshal(data, &mapthing)
 	fmt.Println("update player", result)
-	fmt.Println("update mapthing", mapthing)
 	return result, err
 }
 
-func (db PlayerTable) Delete(id string) error {
-	_, _, err := db.client.From("players").Delete("", "").Filter("id", "eq", id).Execute()
+func (db PlayerTable) Delete(id int) error {
+	query := deleteSingle(db.from())
+	query = filterById(query, id)
+	_, _, err := query.Execute()
 	return err
 }
 
-func (db PlayerTable) GetActions(id string) ([]Action, error) {
-	data, _, err := db.client.From("actions").Select("*", "exact", false).Filter("player_id", "eq", id).Execute()
-	var actions []Action
-	json.Unmarshal(data, &actions)
-	return actions, err
-}
-
-func (db PlayerTable) GetCharacters(id string) ([]Character, error) {
-	data, _, err := db.client.From("characters").Select("*", "exact", false).Filter("player_id", "eq", id).Execute()
-	var characters []Character
-	json.Unmarshal(data, &characters)
-	return characters, err
+func (table PlayerTable) from() *postgrest.QueryBuilder {
+	return table.client.From("players")
 }

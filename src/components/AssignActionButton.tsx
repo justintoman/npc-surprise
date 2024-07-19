@@ -2,19 +2,19 @@ import { NpcSurpriseApi } from '~/api';
 import { Button } from '~/components/ui/button';
 
 type Props = {
-  player_id?: number;
+  playerId?: number;
   id: number;
 };
 
-export function AssignActionButton({ id, player_id }: Props) {
-  if (!player_id) {
+export function AssignActionButton({ id, playerId }: Props) {
+  if (!playerId) {
     return null;
   }
   return (
     <Button
       size="sm"
       variant="secondary"
-      onClick={() => NpcSurpriseApi.assign('action', id, player_id)}
+      onClick={() => NpcSurpriseApi.assign('action', id, playerId)}
     >
       Reveal
     </Button>

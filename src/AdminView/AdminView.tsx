@@ -65,12 +65,12 @@ function PlayersList() {
         {players.map((player) => (
           <li
             key={player.id}
-            data-online={player.is_online}
+            data-online={player.isOnline}
             className="group flex items-center justify-between space-x-2 rounded-sm px-4 py-2"
           >
             <div className="leading-0 flex h-full items-center space-x-2">
               <div
-                title={player.is_online ? 'Online' : 'Offline'}
+                title={player.isOnline ? 'Online' : 'Offline'}
                 className="h-3 w-3 rounded-full bg-gray-500 group-data-[online=true]:bg-teal-500"
               />
               <span className="text-muted-foreground group-data-[online=true]:font-bold group-data-[online=true]:text-secondary-foreground">

@@ -1,6 +1,5 @@
 import { atom, createStore } from 'jotai';
-import { atomWithRefresh, loadable } from 'jotai/utils';
-import { NpcSurpriseApi } from '~/api';
+import { StatusResponse } from '~/api';
 import { Action, Character, Player } from '~/types';
 
 export const store = createStore();
@@ -19,7 +18,7 @@ export function initStream() {
 
   eventSource.onerror = (e) => {
     console.error(e);
-    store.set(statusAtom);
+    store.set(statusAtom, null);
   };
 
   return function close() {
@@ -52,8 +51,8 @@ type ActionMessage = {
   data: Action;
 };
 
-type ConnectedMessage = {
-  type: 'connected';
+type InitMessage = {
+  type: 'init';
   data: {
     players: Player[];
     characters: Character[];
@@ -81,7 +80,7 @@ type Message =
   | UnassignMessage
   | CharacterMessage
   | ActionMessage
-  | ConnectedMessage
+  | InitMessage
   | PlayerConnectedMessage
   | PlayerDisconnectedMessage
   | DeleteMessage;
@@ -91,7 +90,7 @@ function handleEvents(message: Message) {
     case 'assign-action': {
       const characters = store.get(charactersAtomInternal);
       const character = characters.find(
-        (char) => char.id === message.data.character_id,
+        (char) => char.id === message.data.characterId,
       );
       if (!character) {
         return;
@@ -120,6 +119,29 @@ function handleEvents(message: Message) {
       if (!character) {
         return;
       }
+      const action = character.actions.find((a) => a.id === message.data);
+      if (!action) {
+        return;
+      }
+      const isAdmin = store.get(isAdminAtom);
+      if (isAdmin) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { playerId, ...updated } = action;
+        store.set(
+          charactersAtomInternal,
+          characters.map((char) =>
+            char === character
+              ? {
+                  ...character,
+                  actions: character.actions.map((a) =>
+                    a.id === message.data ? updated : a,
+                  ),
+                }
+              : char,
+          ),
+        );
+        return;
+      }
 
       store.set(
         charactersAtomInternal,
@@ -136,6 +158,20 @@ function handleEvents(message: Message) {
     }
     case 'unassign-character': {
       const characters = store.get(charactersAtomInternal);
+      const isAdmin = store.get(isAdminAtom);
+      if (!isAdmin) {
+        const character = characters.find((char) => char.id === message.data);
+        if (!character) {
+          return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { playerId, ...updated } = character;
+        store.set(
+          charactersAtomInternal,
+          characters.map((char) => (char.id === message.data ? updated : char)),
+        );
+        return;
+      }
       store.set(
         charactersAtomInternal,
         characters.filter((char) => char.id !== message.data),
@@ -168,19 +204,20 @@ function handleEvents(message: Message) {
       );
       break;
     }
-    case 'connected': {
+    case 'init': {
       store.set(playersAtomInternal, message.data.players);
       store.set(charactersAtomInternal, message.data.characters);
       break;
     }
     case 'player-connected': {
       const players = store.get(playersAtomInternal);
-      const exists = players.some((p) => p.id === message.data.id);
+      const player = players.find((p) => p.id === message.data.id);
+      const updated = { ...(player ?? message.data), isOnline: true };
       store.set(
         playersAtomInternal,
-        exists
-          ? players.map((p) => (p.id === message.data.id ? message.data : p))
-          : [...players, { ...message.data, is_online: true }],
+        player
+          ? players.map((p) => (p.id === message.data.id ? updated : p))
+          : [...players, updated],
       );
       break;
     }
@@ -189,7 +226,7 @@ function handleEvents(message: Message) {
       store.set(
         playersAtomInternal,
         players.map((player) =>
-          player.id === message.data ? { ...player, is_online: false } : player,
+          player.id === message.data ? { ...player, isOnline: false } : player,
         ),
       );
       break;
@@ -213,6 +250,14 @@ function handleEvents(message: Message) {
       );
       break;
     }
+    case 'delete-player': {
+      const players = store.get(playersAtomInternal);
+      store.set(
+        playersAtomInternal,
+        players.filter((player) => player.id !== message.data),
+      );
+      break;
+    }
     default: {
       console.error('Invalid message type', message);
     }
@@ -227,11 +272,9 @@ export const charactersAtom = atom<Character[]>((get) =>
   get(charactersAtomInternal),
 );
 
-export const statusAtom = atomWithRefresh(async () => {
-  return NpcSurpriseApi.status();
-});
+export const statusAtom = atom<StatusResponse | null>(null);
 
 export const isAdminAtom = atom((get) => {
-  const loaded = get(loadable(statusAtom));
-  return loaded.state === 'hasData' && loaded.data.is_admin;
+  const status = get(statusAtom);
+  return Boolean(status?.isAdmin);
 });

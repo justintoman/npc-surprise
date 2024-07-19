@@ -11,17 +11,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '~/components/ui/dialog';
-import { isAdminAtom } from '~/state';
+import { isAdminAtom, statusAtom } from '~/state';
 import type { Action } from '~/types';
 
 export function Action({ action }: { action: Action }) {
   const isAdmin = useAtomValue(isAdminAtom);
+  const status = useAtomValue(statusAtom);
+  console.log({ isAdmin, status });
   const [isEditing, setIsEditing] = useState(false);
   return (
     <div>
       {isAdmin ? (
         <div className="flex items-center justify-start space-x-4">
-          <AssignActionButton id={action.id} player_id={action.player_id} />
+          <AssignActionButton id={action.id} playerId={action.playerId} />
           <Dialog open={isEditing} onOpenChange={setIsEditing}>
             <DialogTrigger asChild>
               <Button size="icon">
@@ -34,7 +36,7 @@ export function Action({ action }: { action: Action }) {
               </DialogHeader>
               <ActionForm
                 id={action.id}
-                character_id={action.character_id}
+                characterId={action.characterId}
                 defaultValues={action}
                 onClose={() => setIsEditing(false)}
               />

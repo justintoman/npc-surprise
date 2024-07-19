@@ -1,57 +1,81 @@
 package router
 
 import (
-	"log/slog"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/justintoman/npc-surprise/db"
-	"github.com/justintoman/npc-surprise/stream"
 )
 
-type CreateActionInput struct {
-	db.ActionBase
+func (r *Router) CreateAction(c *gin.Context, input *db.CreateActionPayload) error {
+	action, err := r.ActionService.Create(*input)
+	if err != nil {
+		return err
+	}
+	r.stream.SendActionMessage(action)
+	return nil
 }
 
-func (r *Router) CreateAction(c *gin.Context, input *CreateActionInput) (db.Action, error) {
-	action, err := r.db.Action.Create(db.CreateActionPayload{ActionBase: input.ActionBase})
+func (r *Router) UpdateAction(c *gin.Context, input *db.Action) error {
+	action, err := r.ActionService.Update(*input)
 	if err != nil {
-		slog.Error("Error updating action", "error", err)
-		return db.Action{}, err
+		return err
 	}
-	r.stream.SendMessage("admin", stream.MessagePayload{Type: "action", Data: action})
-	return action, nil
+	r.stream.SendActionMessage(action)
+	return nil
 }
 
-type UpdateActionInput struct {
-	db.Action
+type AssignActionInput struct {
+	ActionId int `uri:"id" binding:"required,gt=0"`
 }
 
-func (r *Router) UpdateAction(c *gin.Context, input *UpdateActionInput) (db.Action, error) {
-	_, err := r.db.Action.Update(db.UpdateActionPayload{Action: input.Action})
+func (r Router) AssignAction(c *gin.Context) error {
+	var input AssignActionInput
+	err := c.BindUri(&input)
 	if err != nil {
-		slog.Error("Error updating action", "error", err)
-		return db.Action{}, err
+		return err
 	}
-	action, err := r.db.Action.Get(strconv.Itoa(input.Id))
+
+	action, err := r.ActionService.Assign(input.ActionId)
 	if err != nil {
-		slog.Error("Error fetching updated action", "error", err)
-		return db.Action{}, err
+		return err
 	}
-	r.stream.SendMessage("admin", stream.MessagePayload{Type: "action", Data: action})
-	if action.PlayerId != 0 {
-		r.stream.SendMessage(strconv.Itoa(action.PlayerId), stream.MessagePayload{Type: "action", Data: action})
+	r.stream.SendActionMessage(action)
+	return nil
+}
+
+type UnassignActionInput struct {
+	ActionId int `uri:"id" binding:"required,gt=0"`
+}
+
+func (r Router) UnassignAction(c *gin.Context) error {
+	var input UnassignActionInput
+	err := c.BindUri(&input)
+	if err != nil {
+		return err
 	}
-	return action, nil
+	unassignedPlayerId, err := r.ActionService.Unassign(input.ActionId)
+	if err != nil {
+		return err
+	}
+	r.stream.SendUnassignActionMessage(unassignedPlayerId, input.ActionId)
+	return nil
+
+}
+
+type DeleteInput struct {
+	Id int `uri:"id" binding:"required,gt=0"`
 }
 
 func (r *Router) DeleteAction(c *gin.Context) error {
-	id := c.Params.ByName("id")
-	err := r.db.Action.Delete(id)
+	var input DeleteInput
+	err := c.BindUri(&input)
 	if err != nil {
-		slog.Error("Error deleting action", "error", err)
 		return err
 	}
-	r.stream.SendMessage("admin", stream.MessagePayload{Type: "delete-action", Data: id})
+
+	err = r.ActionService.Delete(input.Id)
+	if err != nil {
+		return err
+	}
+	r.stream.SendDeleteActionMessage(input.Id)
 	return nil
 }

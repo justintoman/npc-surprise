@@ -64,7 +64,7 @@ export function Character({ character }: Props) {
             <DialogContent>
               <DialogHeader>Add Action</DialogHeader>
               <ActionForm
-                character_id={character.id}
+                characterId={character.id}
                 defaultValues={getNewAction()}
                 onClose={() => setIsAddingAction(false)}
               />
