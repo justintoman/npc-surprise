@@ -10,7 +10,7 @@ func (r *Router) CreateAction(c *gin.Context, input *db.CreateActionPayload) err
 	if err != nil {
 		return err
 	}
-	r.stream.SendActionMessage(action)
+	r.stream.SendAdminActionMessage(action)
 	return nil
 }
 
@@ -19,44 +19,45 @@ func (r *Router) UpdateAction(c *gin.Context, input *db.Action) error {
 	if err != nil {
 		return err
 	}
-	r.stream.SendActionMessage(action)
+	r.stream.SendAdminActionMessage(action)
 	return nil
 }
 
 type AssignActionInput struct {
-	ActionId int `uri:"id" binding:"required,gt=0"`
+	CharacterId int `uri:"characterId" binding:"required,gt=0"`
+	ActionId    int `uri:"actionId" binding:"required,gt=0"`
 }
 
-func (r Router) AssignAction(c *gin.Context) error {
+func (r Router) RevealAction(c *gin.Context) error {
 	var input AssignActionInput
 	err := c.BindUri(&input)
 	if err != nil {
 		return err
 	}
 
-	action, err := r.ActionService.Assign(input.ActionId)
+	playerId, action, err := r.ActionService.Reveal(input.ActionId)
 	if err != nil {
 		return err
 	}
-	r.stream.SendActionMessage(action)
+	r.stream.SendPlayerActionMessage(playerId, action)
 	return nil
 }
 
 type UnassignActionInput struct {
-	ActionId int `uri:"id" binding:"required,gt=0"`
+	ActionId int `uri:"actionId" binding:"required,gt=0"`
 }
 
-func (r Router) UnassignAction(c *gin.Context) error {
+func (r Router) HideAction(c *gin.Context) error {
 	var input UnassignActionInput
-	err := c.BindUri(&input)
+	err := c.ShouldBindUri(&input)
 	if err != nil {
 		return err
 	}
-	unassignedPlayerId, err := r.ActionService.Unassign(input.ActionId)
+	playerId, action, err := r.ActionService.Hide(input.ActionId)
 	if err != nil {
 		return err
 	}
-	r.stream.SendUnassignActionMessage(unassignedPlayerId, input.ActionId)
+	r.stream.SendHideActionMessage(playerId, action)
 	return nil
 
 }

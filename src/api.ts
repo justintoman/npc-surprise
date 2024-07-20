@@ -1,25 +1,23 @@
 import ky from 'ky';
-import { Action, Character, Player } from '~/types';
+import { Action, Character, CharacterRevealedFields } from '~/types';
 
 const client = ky.create({
   prefixUrl: '/api',
 });
 
 export const NpcSurpriseApi = {
+  // auth
   login(name: string): Promise<Required<StatusResponse>> {
     const response = client.post('login', { json: { name: name } });
     return response.json();
-  },
-  getPlayers(): Promise<Player[]> {
-    return client.get('players').json<Player[]>();
   },
   status(): Promise<StatusResponse> {
     return client.get('status').json();
   },
 
-  getCharacters(): Promise<Array<Character>> {
-    return client.get('characters').json<Array<Character>>();
-  },
+  /**
+   * Characters
+   */
 
   createCharacter(character: Omit<Character, 'id' | 'actions'>) {
     return client.post('characters', { json: character }).json<Character>();
@@ -31,28 +29,56 @@ export const NpcSurpriseApi = {
       .json<Character>();
   },
 
+  assignCharacter(id: number, playerId: number) {
+    return client.put(`characters/${id}/assign/${playerId}`).json();
+  },
+
+  unassignCharacter(id: number) {
+    return client.put(`characters/${id}/unassign`).json();
+  },
+
+  updateRevealedFields(charaterId: number, fields: CharacterRevealedFields) {
+    return client
+      .put(`characters/${charaterId}/reveal`, { json: fields })
+      .json();
+  },
+
   deleteCharacter(id: number) {
     return client.delete(`characters/${id}`).json();
   },
 
+  /**
+   * Actions
+   */
+
   createAction(action: Omit<Action, 'id'>) {
-    return client.post('actions', { json: action }).json<Action>();
+    return client.post(`characters/${action.characterId}/actions`, {
+      json: action,
+    });
   },
 
   updateAction(action: Action) {
-    return client.put(`actions/${action.id}`, { json: action }).json<Action>();
+    return client.put(`characters/${action.characterId}/actions/${action.id}`, {
+      json: action,
+    });
   },
 
-  deleteAction(id: number) {
-    return client.delete(`actions/${id}`).json();
+  revealAction(characterId: number, actionId: number) {
+    return client.put(`characters/${characterId}/actions/${actionId}/reveal`);
   },
 
-  assign(type: 'action' | 'character', id: number, playerId: number) {
-    return client.post('assign', { json: { id, playerId, type } }).json();
+  hideAction(characterId: number, actionId: number) {
+    return client.put(`characters/${characterId}/actions/${actionId}/hide`);
   },
 
-  deletePlayer(id: number): Promise<void> {
-    return client.delete(`players/${id}`).json();
+  deleteAction(characterId: number, actionId: number) {
+    return client
+      .delete(`characters/${characterId}/actions/${actionId}`)
+      .json();
+  },
+
+  deletePlayer(playerId: number): Promise<void> {
+    return client.delete(`players/${playerId}`).json();
   },
 };
 

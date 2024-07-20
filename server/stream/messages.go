@@ -1,82 +1,16 @@
 package stream
 
-import "github.com/justintoman/npc-surprise/db"
+import (
+	"log/slog"
+
+	"github.com/justintoman/npc-surprise/db"
+)
 
 const AdminPlayerId = 0
-
-type AssignActionMessage struct {
-	Type string    `json:"type" validate:"required,eq=assign-action"`
-	Data db.Action `json:"action" validate:"required"`
-}
-
-func (stream *EventStream) SendAssignActionMessage(action db.Action) {
-	payload := AssignActionMessage{
-		Type: "assign-action",
-		Data: action,
-	}
-	stream.sendMessage(action.PlayerId, payload)
-	stream.sendAdminMessage(payload)
-}
-
-type AssignCharacterMessage struct {
-	Type string                  `json:"type" validate:"required,eq=assign-character"`
-	Data db.CharacterWithActions `json:"character" validate:"required"`
-}
-
-func (stream *EventStream) SendAssignCharacterMessage(character db.CharacterWithActions) {
-	payload := AssignCharacterMessage{
-		Type: "assign-character",
-		Data: character,
-	}
-	stream.sendMessage(character.PlayerId, payload)
-	stream.sendAdminMessage(payload)
-}
-
-type UnassignMessage struct {
-	Type string `json:"type" validate:"required,oneof=unassign-action unassign-character"`
-	Data int    `json:"data" validate:"required"` // action id or character id
-}
-
-func (stream *EventStream) SendUnassignActionMessage(playerId int, actionId int) {
-	payload := UnassignMessage{
-		Type: "unassign-action",
-		Data: actionId,
-	}
-	stream.sendAdminMessage(payload)
-	stream.sendMessage(playerId, payload)
-}
-
-func (stream *EventStream) SendUnassignCharacterMessage(playerId int, characterId int) {
-	payload := UnassignMessage{
-		Type: "unassign-character",
-		Data: characterId,
-	}
-	stream.sendAdminMessage(payload)
-	stream.sendMessage(playerId, payload)
-}
 
 type CharacterMessage struct {
 	Type string                  `json:"type" validate:"required,eq=character"`
 	Data db.CharacterWithActions `json:"data" validate:"required"`
-}
-
-func (stream *EventStream) SendAdminCharacterMessage(character db.CharacterWithActions) {
-	payload := CharacterMessage{
-		Type: "character",
-		Data: character,
-	}
-	stream.sendAdminMessage(payload)
-}
-func (stream *EventStream) SendPlayerCharacterMessage(character db.CharacterWithActions) {
-	if character.PlayerId == 0 {
-		// not assigned, no one to send it to
-		return
-	}
-	payload := CharacterMessage{
-		Type: "character",
-		Data: character,
-	}
-	stream.sendMessage(character.PlayerId, payload)
 }
 
 type ActionMessage struct {
@@ -84,15 +18,9 @@ type ActionMessage struct {
 	Data db.Action `json:"data" validate:"required"`
 }
 
-func (stream *EventStream) SendActionMessage(action db.Action) {
-	payload := ActionMessage{
-		Type: "action",
-		Data: action,
-	}
-	stream.sendAdminMessage(payload)
-	if action.PlayerId != 0 {
-		stream.sendMessage(action.PlayerId, payload)
-	}
+type DeleteMessage struct {
+	Type string `json:"type" validate:"required,oneof=delete-action delete-character delete-player"`
+	Data int    `json:"data" validate:"required"` // player, character, action id
 }
 
 type InitMessage struct {
@@ -111,7 +39,21 @@ type PlayerWithStatus struct {
 	IsOnline bool   `json:"isOnline" validate:"required"`
 }
 
-func (stream *EventStream) SendInitMessage(playerId int, characters []db.CharacterWithActions) {
+type PlayerConnectedMessage struct {
+	Type string    `json:"type" validate:"required,eq=player-connected"`
+	Data db.Player `json:"data" validate:"required"`
+}
+
+type PlayerDisconnectedMessage struct {
+	Type string `json:"type" validate:"required,eq=player-disconnected"`
+	Data int    `json:"data" validate:"required"` // player id
+}
+
+/****************************************
+*********** Player Messages *************
+*****************************************/
+
+func (stream *EventStream) SendInitPlayerMessage(playerId int, characters []db.CharacterWithActions) {
 	payload := InitMessage{
 		Type: "init",
 		Data: InitMessageData{
@@ -121,6 +63,60 @@ func (stream *EventStream) SendInitMessage(playerId int, characters []db.Charact
 	}
 	stream.sendMessage(playerId, payload)
 }
+
+func (stream *EventStream) SendPlayerCharacterMessage(character db.CharacterWithActions) {
+	if character.PlayerId == nil {
+		slog.Error("unabled to reveal character because character not assigned to a player", "characterId", character.Id)
+		return
+	}
+	stream.sendMessage(*character.PlayerId, CharacterMessage{
+		Type: "character",
+		Data: character,
+	})
+}
+
+// since actions are either completely revealed or hidden, send to both admin and player
+func (stream *EventStream) SendPlayerActionMessage(playerId int, action db.Action) {
+	payload := ActionMessage{
+		Type: "action",
+		Data: action,
+	}
+	stream.sendAdminMessage(payload)
+	stream.sendMessage(playerId, ActionMessage{
+		Type: "action",
+		Data: action,
+	})
+}
+
+func (stream *EventStream) SendHideActionMessage(playerId int, action db.Action) {
+	stream.sendAdminMessage(ActionMessage{
+		Type: "action",
+		Data: action,
+	})
+
+	// from the player's perspective, the action was deleted
+	stream.sendMessage(playerId, DeleteMessage{
+		Type: "delete-action",
+		Data: action.Id,
+	})
+}
+
+func (stream *EventStream) SendHideCharacterMessage(playerId int, character db.CharacterWithActions) {
+	stream.sendAdminMessage(CharacterMessage{
+		Type: "character",
+		Data: character,
+	})
+
+	// from the player's perspective, the character was deleted
+	stream.sendMessage(playerId, DeleteMessage{
+		Type: "delete-character",
+		Data: character.Id,
+	})
+}
+
+/****************************************
+*********** Admin Messages *************
+*****************************************/
 
 func (stream *EventStream) SendInitAdminMessage(players []db.Player, characters []db.CharacterWithActions) {
 	connectedPlayers := stream.GetClients()
@@ -143,67 +139,61 @@ func (stream *EventStream) SendInitAdminMessage(players []db.Player, characters 
 		}
 		playersWithStatus = append(playersWithStatus, p)
 	}
-	payload := InitMessage{
+
+	stream.sendAdminMessage(InitMessage{
 		Type: "init",
 		Data: InitMessageData{
 			Players:    playersWithStatus,
 			Characters: characters,
 		},
-	}
-	stream.sendAdminMessage(payload)
+	})
 }
 
-type PlayerConnectedMessage struct {
-	Type string    `json:"type" validate:"required,eq=player-connected"`
-	Data db.Player `json:"data" validate:"required"`
+func (stream *EventStream) SendAdminCharacterMessage(character db.CharacterWithActions) {
+	stream.sendAdminMessage(CharacterMessage{
+		Type: "character",
+		Data: character,
+	})
+}
+
+func (stream *EventStream) SendAdminActionMessage(action db.Action) {
+	stream.sendAdminMessage(ActionMessage{
+		Type: "action",
+		Data: action,
+	})
 }
 
 func (stream *EventStream) SendPlayerConnectedMessage(player db.Player) {
-	payload := PlayerConnectedMessage{
+	stream.sendAdminMessage(PlayerConnectedMessage{
 		Type: "player-connected",
 		Data: player,
-	}
-	stream.sendAdminMessage(payload)
-}
-
-type PlayerDisconnectedMessage struct {
-	Type string `json:"type" validate:"required,eq=player-disconnected"`
-	Data int    `json:"data" validate:"required"` // player id
+	})
 }
 
 func (stream *EventStream) SendPlayerDisconnectedMessage(playerId int) {
-	payload := PlayerDisconnectedMessage{
+	stream.sendAdminMessage(PlayerDisconnectedMessage{
 		Type: "player-disconnected",
 		Data: playerId,
-	}
-	stream.sendAdminMessage(payload)
-}
-
-type DeleteMessage struct {
-	Type string `json:"type" validate:"required,oneof=delete-action delete-character delete-player"`
-	Data int    `json:"data" validate:"required"` // player, character, action id
-}
-
-func (stream *EventStream) SendDeleteActionMessage(id int) {
-	payload := DeleteMessage{
-		Type: "delete-action",
-		Data: id,
-	}
-	stream.sendAdminMessage(payload)
+	})
 }
 
 func (stream *EventStream) SendDeleteCharacterMessage(id int) {
-	payload := DeleteMessage{
+	stream.sendAdminMessage(DeleteMessage{
 		Type: "delete-character",
 		Data: id,
-	}
-	stream.sendAdminMessage(payload)
+	})
+}
+
+func (stream *EventStream) SendDeleteActionMessage(id int) {
+	stream.sendAdminMessage(DeleteMessage{
+		Type: "delete-action",
+		Data: id,
+	})
 }
 
 func (stream *EventStream) SendDeletePlayerMessage(id int) {
-	payload := DeleteMessage{
+	stream.sendAdminMessage(DeleteMessage{
 		Type: "delete-player",
 		Data: id,
-	}
-	stream.sendAdminMessage(payload)
+	})
 }

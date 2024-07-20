@@ -18,9 +18,13 @@ export type Character = {
   actions: Action[];
 };
 
+export type CharacterRevealedFields = {
+  [Key in keyof Omit<Character, 'id' | 'playerId' | 'actions'>]: boolean;
+};
+
 export type Action = {
   id: number;
-  playerId?: number;
+  revealed: boolean;
   characterId: number;
   type: string;
   content: string;

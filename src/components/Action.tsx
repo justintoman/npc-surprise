@@ -2,7 +2,7 @@ import { useAtomValue } from 'jotai';
 import { Edit } from 'lucide-react';
 import { useState } from 'react';
 import { ActionForm } from '~/AdminView/ActionForm';
-import { AssignActionButton } from '~/components/AssignActionButton';
+import { RevealActionButton } from '~/components/RevealActionButton';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -23,7 +23,11 @@ export function Action({ action }: { action: Action }) {
     <div>
       {isAdmin ? (
         <div className="flex items-center justify-start space-x-4">
-          <AssignActionButton id={action.id} playerId={action.playerId} />
+          <RevealActionButton
+            actionId={action.id}
+            characterId={action.characterId}
+            revealed={action.revealed}
+          />
           <Dialog open={isEditing} onOpenChange={setIsEditing}>
             <DialogTrigger asChild>
               <Button size="icon">

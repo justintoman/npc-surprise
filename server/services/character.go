@@ -107,7 +107,7 @@ func (s *CharacterService) Redact(character db.CharacterWithActions) (db.Charact
 	}
 	actions := make([]db.Action, 0)
 	for _, action := range character.Actions {
-		if action.CharacterId != character.Id {
+		if !action.Revealed {
 			continue
 		}
 		actions = append(actions, action)
@@ -141,91 +141,73 @@ func redactCharacter(character *db.Character, revealedFields db.CharacterRevelea
 	}
 }
 
-func (s *CharacterService) Assign(characterId int, playerId int) (db.CharacterWithActions, error) {
+func (s *CharacterService) Assign(characterId int, playerId int) (*int, db.CharacterWithActions, error) {
 	character, err := s.db.Character.Get(characterId)
 	if err != nil {
 		slog.Error("error getting character to assign", "error", err, "characterId", characterId)
-		return db.CharacterWithActions{}, err
-	}
-	if character.PlayerId == playerId {
-		slog.Error("already assigned to target player", "characterId", characterId, "playerId", playerId)
-		return db.CharacterWithActions{}, fmt.Errorf("character already assigned to target player")
+		return nil, db.CharacterWithActions{}, err
 	}
 
-	// if there any any actions from this character that are assigned, unassign them
 	actions, err := s.db.Action.GetAll(characterId)
 	if err != nil {
-		return db.CharacterWithActions{}, err
-	}
-	for i, action := range actions {
-		if action.PlayerId != 0 {
-			prevPlayerId := action.PlayerId
-			action.PlayerId = 0
-			actions[i], err = s.db.Action.Update(action)
-			if err != nil {
-				slog.Error("error unassigning action from previous player", "error", err)
-				return db.CharacterWithActions{}, err
-			}
-
-			s.stream.SendUnassignActionMessage(prevPlayerId, action.Id)
-		}
+		return nil, db.CharacterWithActions{}, err
 	}
 
 	prevPlayerId := character.PlayerId
-	character.PlayerId = playerId
+	character.PlayerId = &playerId
 	character, err = s.db.Character.Update(character)
 	if err != nil {
 		slog.Error("error updating character", "error", err)
-		return db.CharacterWithActions{}, err
-	}
-	if prevPlayerId != character.PlayerId {
-		// if this was assigned from a previous player, send an unassign message to them
-		s.stream.SendUnassignCharacterMessage(character.PlayerId, character.Id)
+		return nil, db.CharacterWithActions{}, err
 	}
 
 	withActions := db.CharacterWithActions{
 		Character: character,
 		Actions:   actions,
 	}
-	return withActions, nil
+	return prevPlayerId, withActions, nil
 }
 
-func (s *CharacterService) Unassign(characterId int) (int, error) {
+func (s *CharacterService) Unassign(characterId int) (int, db.CharacterWithActions, error) {
 	character, err := s.db.Character.Get(characterId)
 	if err != nil {
 		slog.Error("error getting character to unassign", "error", err, "characterId", characterId)
-		return 0, err
+		return 0, db.CharacterWithActions{}, err
 	}
-	if character.PlayerId == 0 {
+	if character.PlayerId == nil {
 		slog.Error("character not assigned to a player", "characterId", characterId)
-		return 0, fmt.Errorf("character not assigned to a player, can't unassign from nobody")
+		return 0, db.CharacterWithActions{}, fmt.Errorf("character not assigned to a player, can't unassign from nobody")
 	}
-	prevPlayerId := character.PlayerId
-	character.PlayerId = 0
+	prevPlayerId := *character.PlayerId
+	character.PlayerId = nil
 	character, err = s.db.Character.Update(character)
 	if err != nil {
 		slog.Error("error updating character", "error", err)
-		return 0, err
+		return 0, db.CharacterWithActions{}, err
 	}
+
+	// hide any currently revealed actions
 	actions, err := s.db.Action.GetAll(characterId)
 	if err != nil {
-		slog.Error("error getting actions for character", "error", err, "characterId", characterId)
-		return 0, err
+		return 0, db.CharacterWithActions{}, err
 	}
-	for _, action := range actions {
-		if action.PlayerId == 0 {
-			continue
+	for i, action := range actions {
+		if action.Revealed {
+			action.Revealed = false
+			actions[i], err = s.db.Action.Update(action)
+			if err != nil {
+				slog.Error("error unassigning action from previous player", "error", err)
+				return 0, db.CharacterWithActions{}, err
+			}
 		}
-		prevPlayerId := action.PlayerId
-		action.PlayerId = 0
-		action, err = s.db.Action.Update(action)
-		if err != nil {
-			slog.Error("error unassigning action from previous player", "error", err)
-			return 0, err
-		}
-		s.stream.SendUnassignActionMessage(prevPlayerId, action.Id)
 	}
-	return prevPlayerId, nil
+
+	withActions := db.CharacterWithActions{
+		Character: character,
+		Actions:   actions,
+	}
+
+	return prevPlayerId, withActions, nil
 }
 
 func (s *CharacterService) UpdateRevealedFields(input db.CharacterReveleadFields) (db.CharacterWithActions, error) {

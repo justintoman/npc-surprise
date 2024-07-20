@@ -11,7 +11,7 @@ import (
 type Character struct {
 	Id          int    `json:"id"`
 	Name        string `json:"name"`
-	PlayerId    int    `json:"playerId"`
+	PlayerId    *int   `json:"playerId"`
 	Race        string `json:"race,omitempty"`
 	Gender      string `json:"gender,omitempty"`
 	Age         string `json:"age,omitempty"`

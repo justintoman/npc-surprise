@@ -38,7 +38,7 @@ func (r Router) UpdateCharacter(c *gin.Context, input *db.Character) error {
 }
 
 type AssignCharacterInput struct {
-	CharacterId int `uri:"id" binding:"required,gt=0"`
+	CharacterId int `uri:"characterId" binding:"required,gt=0"`
 	PlayerId    int `uri:"playerId" binding:"required,gt=0"`
 }
 
@@ -49,21 +49,25 @@ func (r Router) AssignCharacter(c *gin.Context) error {
 		return err
 	}
 
-	adminCharacter, err := r.CharacterService.Assign(input.CharacterId, input.PlayerId)
+	prevPlayerId, character, err := r.CharacterService.Assign(input.CharacterId, input.PlayerId)
 	if err != nil {
 		return err
 	}
-	playerCharacter, err := r.CharacterService.Redact(adminCharacter)
+	redacted, err := r.CharacterService.Redact(character)
 	if err != nil {
 		return err
 	}
-	r.stream.SendAdminCharacterMessage(adminCharacter)
-	r.stream.SendPlayerCharacterMessage(playerCharacter)
+	r.stream.SendPlayerCharacterMessage(redacted)
+	if prevPlayerId != nil {
+		r.stream.SendHideCharacterMessage(*prevPlayerId, character)
+	} else {
+		r.stream.SendAdminCharacterMessage(character)
+	}
 	return nil
 }
 
 type UnassignCharacterInput struct {
-	CharacterId int `uri:"id" binding:"required,gt=0"`
+	CharacterId int `uri:"characterId" binding:"required,gt=0"`
 }
 
 func (r Router) UnassignCharacter(c *gin.Context) error {
@@ -73,11 +77,11 @@ func (r Router) UnassignCharacter(c *gin.Context) error {
 		return err
 	}
 
-	prevPlayerId, err := r.CharacterService.Unassign(input.CharacterId)
+	playerId, character, err := r.CharacterService.Unassign(input.CharacterId)
 	if err != nil {
 		return err
 	}
-	r.stream.SendUnassignCharacterMessage(prevPlayerId, input.CharacterId)
+	r.stream.SendHideCharacterMessage(playerId, character)
 	return nil
 }
 

@@ -48,18 +48,18 @@ func New(db db.Db, adminKey string) *gin.Engine {
 
 	characterRoutes := adminRoutes.Group("/characters")
 	characterRoutes.POST("", tonic.Handler(router.CreateCharacter, 200))
-	characterRoutes.PUT("/:id", tonic.Handler(router.UpdateCharacter, 200))
-	characterRoutes.PUT("/:id/assign/:playerId", tonic.Handler(router.AssignCharacter, 200))
-	characterRoutes.PUT("/:id/unassign", tonic.Handler(router.UnassignCharacter, 200))
-	characterRoutes.PUT("/:id/reveal", tonic.Handler(router.UpdateRevealedFields, 200))
-	characterRoutes.DELETE("/:id", tonic.Handler(router.DeleteCharacter, 200))
+	characterRoutes.PUT("/:characterId", tonic.Handler(router.UpdateCharacter, 200))
+	characterRoutes.PUT("/:characterId/assign/:playerId", tonic.Handler(router.AssignCharacter, 200))
+	characterRoutes.PUT("/:characterId/unassign", tonic.Handler(router.UnassignCharacter, 200))
+	characterRoutes.PUT("/:characterId/reveal", tonic.Handler(router.UpdateRevealedFields, 200))
+	characterRoutes.DELETE("/:characterId", tonic.Handler(router.DeleteCharacter, 200))
 
-	actionRoutes := adminRoutes.Group("/actions")
+	actionRoutes := characterRoutes.Group("/:characterId/actions")
 	actionRoutes.POST("", tonic.Handler(router.CreateAction, 200))
-	actionRoutes.PUT(":id", tonic.Handler(router.UpdateAction, 200))
-	actionRoutes.PUT(":id/assign", tonic.Handler(router.AssignAction, 200))
-	actionRoutes.PUT(":id/unassign", tonic.Handler(router.UnassignAction, 200))
-	actionRoutes.DELETE(":id", tonic.Handler(router.DeleteAction, 200))
+	actionRoutes.PUT(":actionId", tonic.Handler(router.UpdateAction, 200))
+	actionRoutes.PUT(":actionId/reveal", tonic.Handler(router.RevealAction, 200))
+	actionRoutes.PUT(":actionId/hide", tonic.Handler(router.HideAction, 200))
+	actionRoutes.DELETE(":actionId", tonic.Handler(router.DeleteAction, 200))
 
 	authRoutes := g.Group("/")
 
@@ -92,7 +92,7 @@ func (r *Router) onPlayerConnected(player db.Player) {
 			slog.Error("error getting characters for player", "error", err, "playerId", player.Id)
 			return
 		}
-		r.stream.SendInitMessage(player.Id, characters)
+		r.stream.SendInitPlayerMessage(player.Id, characters)
 	}
 }
 

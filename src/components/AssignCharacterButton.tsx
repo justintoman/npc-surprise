@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { playersAtom } from '~/state';
@@ -23,10 +24,14 @@ export function AssignCharacterButton({ id }: Props) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
+        <DropdownMenuItem onClick={() => NpcSurpriseApi.unassignCharacter(id)}>
+          Unassign
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {players.map((player) => (
           <DropdownMenuItem
             key={player.id}
-            onClick={() => NpcSurpriseApi.assign('character', id, player.id)}
+            onClick={() => NpcSurpriseApi.assignCharacter(id, player.id)}
           >
             {player.name}
           </DropdownMenuItem>

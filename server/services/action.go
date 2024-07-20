@@ -34,51 +34,56 @@ func (s *ActionService) Update(input db.Action) (db.Action, error) {
 	return action, nil
 }
 
-func (s *ActionService) Assign(actionId int) (db.Action, error) {
+func (s *ActionService) Reveal(actionId int) (int, db.Action, error) {
 	action, err := s.db.Action.Get(actionId)
 	if err != nil {
-		return db.Action{}, err
-	}
-	if action.PlayerId != 0 {
-		slog.Info("already assigned", "actionId", actionId, "current playerId", action.PlayerId)
-		return db.Action{}, nil
+		slog.Error("Error getting action to reveal", "error", err)
+		return 0, db.Action{}, err
 	}
 	character, err := s.db.Character.Get(action.CharacterId)
 	if err != nil {
-		slog.Error("Error getting character", "error", err)
-		return db.Action{}, err
+		slog.Error("Error getting character for action to reveal", "error", err)
+		return 0, db.Action{}, err
 	}
-	if character.PlayerId == 0 {
-		slog.Error("character not assigned to a player", "characterId", action.CharacterId)
-		return db.Action{}, nil
+	if character.PlayerId == nil {
+		slog.Error("character not assigned to a player, cannot reveal action", "characterId", action.CharacterId)
+		return 0, db.Action{}, nil
 	}
-	action.PlayerId = character.PlayerId
+	if action.Revealed {
+		slog.Info("already revealed", "actionId", actionId)
+		return 0, db.Action{}, nil
+	}
+	action.Revealed = true
 	action, err = s.db.Action.Update(action)
 	if err != nil {
-		slog.Error("Error assigning action", "error", err)
-		return db.Action{}, err
+		slog.Error("Error revealing action", "error", err)
+		return 0, db.Action{}, err
 	}
-	return action, nil
+	return *character.PlayerId, action, nil
 }
 
-func (s *ActionService) Unassign(actionId int) (int, error) {
+func (s *ActionService) Hide(actionId int) (int, db.Action, error) {
 	action, err := s.db.Action.Get(actionId)
 	if err != nil {
 		slog.Error("Error getting action", "error", err)
-		return 0, err
+		return 0, db.Action{}, err
 	}
-	if action.PlayerId == 0 {
-		slog.Info("already unassigned", "actionId", actionId)
-		return 0, nil
+	if !action.Revealed {
+		slog.Info("already hidden", "actionId", actionId)
+		return 0, db.Action{}, nil
 	}
-	oldPlayerId := action.PlayerId
-	action.PlayerId = 0
+	character, err := s.db.Character.Get(action.CharacterId)
+	if err != nil {
+		slog.Error("Error getting character for action to hide", "error", err)
+		return 0, db.Action{}, err
+	}
+	action.Revealed = false
 	action, err = s.db.Action.Update(action)
 	if err != nil {
 		slog.Error("Error unassigning action", "error", err)
-		return 0, err
+		return 0, db.Action{}, err
 	}
-	return oldPlayerId, nil
+	return *character.PlayerId, action, nil
 }
 
 func (s *ActionService) Delete(id int) error {

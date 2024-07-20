@@ -26,21 +26,6 @@ export function initStream() {
   };
 }
 
-type AssignActionMessage = {
-  type: 'assign-action';
-  data: Action;
-};
-
-type AssignCharacterMessage = {
-  type: 'assign-character';
-  data: Character;
-};
-
-type UnassignMessage = {
-  type: 'unassign-action' | 'unassign-character';
-  data: number; // id
-};
-
 type CharacterMessage = {
   type: 'character';
   data: Character;
@@ -75,109 +60,21 @@ type DeleteMessage = {
 };
 
 type Message =
-  | AssignActionMessage
-  | AssignCharacterMessage
-  | UnassignMessage
+  | InitMessage
   | CharacterMessage
   | ActionMessage
-  | InitMessage
   | PlayerConnectedMessage
   | PlayerDisconnectedMessage
   | DeleteMessage;
 
 function handleEvents(message: Message) {
   switch (message.type) {
-    case 'assign-action': {
-      const characters = store.get(charactersAtomInternal);
-      const character = characters.find(
-        (char) => char.id === message.data.characterId,
-      );
-      if (!character) {
-        return;
-      }
+    case 'init': {
+      store.set(playersAtomInternal, message.data.players);
+      store.set(charactersAtomInternal, message.data.characters);
+      break;
+    }
 
-      store.set(
-        charactersAtomInternal,
-        characters.map((char) =>
-          char === character
-            ? { ...character, actions: [...character.actions, message.data] }
-            : char,
-        ),
-      );
-      break;
-    }
-    case 'assign-character': {
-      const characters = store.get(charactersAtomInternal);
-      store.set(charactersAtomInternal, [...characters, message.data]);
-      break;
-    }
-    case 'unassign-action': {
-      const characters = store.get(charactersAtomInternal);
-      const character = characters.find((char) =>
-        char.actions.some((a) => a.id === message.data),
-      );
-      if (!character) {
-        return;
-      }
-      const action = character.actions.find((a) => a.id === message.data);
-      if (!action) {
-        return;
-      }
-      const isAdmin = store.get(isAdminAtom);
-      if (isAdmin) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { playerId, ...updated } = action;
-        store.set(
-          charactersAtomInternal,
-          characters.map((char) =>
-            char === character
-              ? {
-                  ...character,
-                  actions: character.actions.map((a) =>
-                    a.id === message.data ? updated : a,
-                  ),
-                }
-              : char,
-          ),
-        );
-        return;
-      }
-
-      store.set(
-        charactersAtomInternal,
-        characters.map((char) =>
-          char === character
-            ? {
-                ...character,
-                actions: character.actions.filter((a) => a.id !== message.data),
-              }
-            : char,
-        ),
-      );
-      break;
-    }
-    case 'unassign-character': {
-      const characters = store.get(charactersAtomInternal);
-      const isAdmin = store.get(isAdminAtom);
-      if (!isAdmin) {
-        const character = characters.find((char) => char.id === message.data);
-        if (!character) {
-          return;
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { playerId, ...updated } = character;
-        store.set(
-          charactersAtomInternal,
-          characters.map((char) => (char.id === message.data ? updated : char)),
-        );
-        return;
-      }
-      store.set(
-        charactersAtomInternal,
-        characters.filter((char) => char.id !== message.data),
-      );
-      break;
-    }
     case 'character': {
       const characters = store.get(charactersAtomInternal);
       const exists = characters.some((char) => char.id === message.data.id);
@@ -191,24 +88,37 @@ function handleEvents(message: Message) {
       );
       break;
     }
+
     case 'action': {
       const characters = store.get(charactersAtomInternal);
+      const character = characters.find(
+        (c) => c.id === message.data.characterId,
+      );
+      if (!character) {
+        console.error(
+          "tried to reveal action for a character that doesn't exist",
+        );
+        return;
+      }
+      const exists = character.actions.some((a) => a.id === message.data.id);
       store.set(
         charactersAtomInternal,
-        characters.map((character) => ({
-          ...character,
-          actions: character.actions.map((a) =>
-            a.id === message.data.id ? message.data : a,
-          ),
-        })),
+        characters.map((c) =>
+          c === character
+            ? {
+                ...character,
+                actions: exists
+                  ? character.actions.map((action) =>
+                      action.id === message.data.id ? message.data : action,
+                    )
+                  : [...character.actions, message.data],
+              }
+            : c,
+        ),
       );
       break;
     }
-    case 'init': {
-      store.set(playersAtomInternal, message.data.players);
-      store.set(charactersAtomInternal, message.data.characters);
-      break;
-    }
+
     case 'player-connected': {
       const players = store.get(playersAtomInternal);
       const player = players.find((p) => p.id === message.data.id);
@@ -221,6 +131,7 @@ function handleEvents(message: Message) {
       );
       break;
     }
+
     case 'player-disconnected': {
       const players = store.get(playersAtomInternal);
       store.set(
@@ -231,6 +142,7 @@ function handleEvents(message: Message) {
       );
       break;
     }
+
     case 'delete-action': {
       const characters = store.get(charactersAtomInternal);
       store.set(
@@ -242,6 +154,7 @@ function handleEvents(message: Message) {
       );
       break;
     }
+
     case 'delete-character': {
       const characters = store.get(charactersAtomInternal);
       store.set(
@@ -250,6 +163,7 @@ function handleEvents(message: Message) {
       );
       break;
     }
+
     case 'delete-player': {
       const players = store.get(playersAtomInternal);
       store.set(
@@ -258,6 +172,7 @@ function handleEvents(message: Message) {
       );
       break;
     }
+
     default: {
       console.error('Invalid message type', message);
     }

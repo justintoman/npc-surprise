@@ -18,7 +18,7 @@ type Action struct {
 	Content     string `json:"content" binding:"required"`
 	Order       int    `json:"order" binding:"required"`
 	CharacterId int    `json:"characterId" binding:"required"`
-	PlayerId    int    `json:"playerId"`
+	Revealed    bool   `json:"revealed" binding:"required"`
 }
 
 type ActionTable struct {
@@ -35,10 +35,10 @@ func (db ActionTable) GetAll(characterId int) ([]Action, error) {
 	return actions, err
 }
 
-func (db ActionTable) GetAllByPlayerId(characterId, playerId int) ([]Action, error) {
+func (db ActionTable) GetAllRevealed(characterId int) ([]Action, error) {
 	query := selectAll(db.from())
 	query = filterByCharacterId(query, characterId)
-	query = filterByPlayerId(query, playerId)
+	query = query.Filter("revealed", "eq", "true")
 	query = orderActions(query)
 	data, _, err := query.Execute()
 	var actions []Action

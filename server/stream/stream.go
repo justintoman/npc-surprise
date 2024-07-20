@@ -19,16 +19,21 @@ type StreamingServer interface {
 	Listen(context.Context)
 	GetClients() []db.Player
 
-	// messages
-	// SendAssignActionMessage(action db.Action)
-	// SendAssignCharacterMessage(character db.CharacterWithActions)
-	SendUnassignActionMessage(playerId int, actionId int)
-	SendUnassignCharacterMessage(playerId int, characterId int)
-	SendAdminCharacterMessage(character db.CharacterWithActions)
-	SendPlayerCharacterMessage(character db.CharacterWithActions)
-	SendActionMessage(action db.Action)
-	SendInitMessage(playerId int, characters []db.CharacterWithActions)
+	// player messages
+
+	SendInitPlayerMessage(playerId int, characters []db.CharacterWithActions)
+
+	// Send a redacted character to only the assigned player.
+	// Note that admins need a full non-redacted character, so this only sends to the player.
+	SendPlayerCharacterMessage(charcter db.CharacterWithActions)
+	SendPlayerActionMessage(playerId int, action db.Action)
+	SendHideActionMessage(playerId int, action db.Action)
+	SendHideCharacterMessage(playerId int, character db.CharacterWithActions)
+
+	// admin messages
 	SendInitAdminMessage(players []db.Player, characters []db.CharacterWithActions)
+	SendAdminCharacterMessage(character db.CharacterWithActions)
+	SendAdminActionMessage(action db.Action)
 	SendPlayerConnectedMessage(player db.Player)
 	SendPlayerDisconnectedMessage(playerId int)
 	SendDeleteCharacterMessage(characterId int)
