@@ -25,13 +25,24 @@ func (s *ActionService) Create(input db.CreateActionPayload) (db.Action, error) 
 	return action, nil
 }
 
-func (s *ActionService) Update(input db.Action) (db.Action, error) {
+func (s *ActionService) Update(input db.Action) (int, db.Action, error) {
 	action, err := s.db.Action.Update(input)
 	if err != nil {
 		slog.Error("Error updating action", "error", err)
-		return db.Action{}, err
+		return 0, db.Action{}, err
 	}
-	return action, nil
+	playerId := 0
+	if action.Revealed {
+		character, err := s.db.Character.Get(action.CharacterId)
+		if err != nil {
+			slog.Error("Error getting character for action to reveal", "error", err)
+			return 0, db.Action{}, err
+		}
+		if character.PlayerId != nil {
+			playerId = *character.PlayerId
+		}
+	}
+	return playerId, action, nil
 }
 
 func (s *ActionService) Reveal(actionId int) (int, db.Action, error) {

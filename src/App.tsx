@@ -9,7 +9,7 @@ export function App() {
           <h1 className="text-xl font-bold">NPC Surprise 🧙‍♂️🪄</h1>
           <ThemeModeToggle />
         </header>
-        <div className="mx-auto mt-8">
+        <div className="mx-auto">
           <Outlet />
         </div>
       </div>

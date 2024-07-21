@@ -1,56 +1,32 @@
-import { useAtomValue } from 'jotai';
-import { Edit } from 'lucide-react';
-import { useState } from 'react';
-import { ActionForm } from '~/AdminView/ActionForm';
+import { Link } from 'react-router-dom';
+import { ActionMarkdown } from '~/components/ActionMarkdown';
 import { RevealActionButton } from '~/components/RevealActionButton';
 import { Button } from '~/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '~/components/ui/dialog';
-import { isAdminAtom, statusAtom } from '~/state';
 import type { Action } from '~/types';
 
-export function Action({ action }: { action: Action }) {
-  const isAdmin = useAtomValue(isAdminAtom);
-  const status = useAtomValue(statusAtom);
-  console.log({ isAdmin, status });
-  const [isEditing, setIsEditing] = useState(false);
+type Props = {
+  action: Action;
+  isAdmin?: boolean;
+};
+
+export function Action({ action, isAdmin }: Props) {
   return (
-    <div>
+    <div className="space-y-8">
       {isAdmin ? (
-        <div className="flex items-center justify-start space-x-4">
+        <div className="flex items-center justify-end space-x-4">
           <RevealActionButton
             actionId={action.id}
             characterId={action.characterId}
             revealed={action.revealed}
           />
-          <Dialog open={isEditing} onOpenChange={setIsEditing}>
-            <DialogTrigger asChild>
-              <Button size="icon">
-                <Edit />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Action</DialogTitle>
-              </DialogHeader>
-              <ActionForm
-                id={action.id}
-                characterId={action.characterId}
-                defaultValues={action}
-                onClose={() => setIsEditing(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button size="icon" asChild>
+            <Link to={`/admin/${action.characterId}/action/${action.id}`}>
+              Edit
+            </Link>
+          </Button>
         </div>
       ) : null}
-      <p>{action.type}</p>
-      <p>{action.direction}</p>
-      <p>{action.content}</p>
+      <ActionMarkdown>{action.content}</ActionMarkdown>
     </div>
   );
 }

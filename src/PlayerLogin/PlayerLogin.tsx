@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useSetAtom } from 'jotai';
 import { Check } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -15,19 +14,16 @@ import {
   FormMessage,
 } from '~/components/ui/form';
 import { Input } from '~/components/ui/input';
-import { statusAtom } from '~/state';
 
 export function PlayerLogin({ name }: { name?: string }) {
   const methods = useForm<LoginForm>({
     resolver: zodResolver(schema),
     defaultValues: { name },
   });
-  const setStatus = useSetAtom(statusAtom);
   const navigate = useNavigate();
   async function submit({ name }: LoginForm) {
     try {
       const status = await NpcSurpriseApi.login(name);
-      setStatus(status);
       if (status.isAdmin) {
         navigate('/admin');
       } else {

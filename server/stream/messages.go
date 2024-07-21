@@ -23,14 +23,20 @@ type DeleteMessage struct {
 	Data int    `json:"data" validate:"required"` // player, character, action id
 }
 
-type InitMessage struct {
-	Type string          `json:"type" validate:"required,eq=init"`
-	Data InitMessageData `json:"data" validate:"required"`
+type InitPlayerMessage struct {
+	Type string                    `json:"type" validate:"required,eq=init-player"`
+	Data []db.CharacterWithActions `json:"data" validate:"required"`
 }
 
-type InitMessageData struct {
-	Players    []PlayerWithStatus        `json:"players" validate:"required"`
-	Characters []db.CharacterWithActions `json:"characters" validate:"required"`
+type InitAdminMessage struct {
+	Type string               `json:"type" validate:"required,eq=init-admin"`
+	Data InitAdminMessageData `json:"data" validate:"required"`
+}
+
+type InitAdminMessageData struct {
+	Players    []PlayerWithStatus           `json:"players" validate:"required"`
+	Characters []db.CharacterWithActions    `json:"characters" validate:"required"`
+	Fields     []db.CharacterReveleadFields `json:"fields" validate:"required"`
 }
 
 type PlayerWithStatus struct {
@@ -54,19 +60,16 @@ type PlayerDisconnectedMessage struct {
 *****************************************/
 
 func (stream *EventStream) SendInitPlayerMessage(playerId int, characters []db.CharacterWithActions) {
-	payload := InitMessage{
-		Type: "init",
-		Data: InitMessageData{
-			Players:    make([]PlayerWithStatus, 0),
-			Characters: characters,
-		},
+	payload := InitPlayerMessage{
+		Type: "init-player",
+		Data: characters,
 	}
 	stream.sendMessage(playerId, payload)
 }
 
 func (stream *EventStream) SendPlayerCharacterMessage(character db.CharacterWithActions) {
 	if character.PlayerId == nil {
-		slog.Error("unabled to reveal character because character not assigned to a player", "characterId", character.Id)
+		slog.Info("unabled to reveal character because character not assigned to a player", "characterId", character.Id)
 		return
 	}
 	stream.sendMessage(*character.PlayerId, CharacterMessage{
@@ -82,10 +85,7 @@ func (stream *EventStream) SendPlayerActionMessage(playerId int, action db.Actio
 		Data: action,
 	}
 	stream.sendAdminMessage(payload)
-	stream.sendMessage(playerId, ActionMessage{
-		Type: "action",
-		Data: action,
-	})
+	stream.sendMessage(playerId, payload)
 }
 
 func (stream *EventStream) SendHideActionMessage(playerId int, action db.Action) {
@@ -118,7 +118,11 @@ func (stream *EventStream) SendHideCharacterMessage(playerId int, character db.C
 *********** Admin Messages *************
 *****************************************/
 
-func (stream *EventStream) SendInitAdminMessage(players []db.Player, characters []db.CharacterWithActions) {
+func (stream *EventStream) SendInitAdminMessage(
+	players []db.Player,
+	characters []db.CharacterWithActions,
+	fields []db.CharacterReveleadFields,
+) {
 	connectedPlayers := stream.GetClients()
 	playersWithStatus := make([]PlayerWithStatus, 0)
 
@@ -140,19 +144,40 @@ func (stream *EventStream) SendInitAdminMessage(players []db.Player, characters 
 		playersWithStatus = append(playersWithStatus, p)
 	}
 
-	stream.sendAdminMessage(InitMessage{
-		Type: "init",
-		Data: InitMessageData{
+	stream.sendAdminMessage(InitAdminMessage{
+		Type: "init-admin",
+		Data: InitAdminMessageData{
 			Players:    playersWithStatus,
 			Characters: characters,
+			Fields:     fields,
 		},
 	})
+}
+
+type AdminCharacterMessage struct {
+	Type string                    `json:"type" validate:"required,eq=character-with-fields"`
+	Data AdminCharacterMessageData `json:"data" validate:"required"`
+}
+
+type AdminCharacterMessageData struct {
+	Character db.CharacterWithActions    `json:"character" validate:"required"`
+	Fields    db.CharacterReveleadFields `json:"fields" validate:"required"`
 }
 
 func (stream *EventStream) SendAdminCharacterMessage(character db.CharacterWithActions) {
 	stream.sendAdminMessage(CharacterMessage{
 		Type: "character",
 		Data: character,
+	})
+}
+
+func (stream *EventStream) SendAdminCharacterMessageWithFields(character db.CharacterWithActions, fields db.CharacterReveleadFields) {
+	stream.sendAdminMessage(AdminCharacterMessage{
+		Type: "character-with-fields",
+		Data: AdminCharacterMessageData{
+			Character: character,
+			Fields:    fields,
+		},
 	})
 }
 

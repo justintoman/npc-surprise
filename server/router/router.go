@@ -74,7 +74,7 @@ func New(db db.Db, adminKey string) *gin.Engine {
 
 func (r *Router) onPlayerConnected(player db.Player) {
 	if player.Id == stream.AdminPlayerId {
-		characters, err := r.CharacterService.GetAllWithActions()
+		characters, fields, err := r.CharacterService.GetAllWithActionsAndFields()
 		if err != nil {
 			slog.Error("error getting characters for player", "error", err)
 			return
@@ -84,7 +84,7 @@ func (r *Router) onPlayerConnected(player db.Player) {
 			slog.Error("error getting players", "error", err)
 			return
 		}
-		r.stream.SendInitAdminMessage(players, characters)
+		r.stream.SendInitAdminMessage(players, characters, fields)
 	} else {
 		r.stream.SendPlayerConnectedMessage(player)
 		characters, err := r.CharacterService.GetAllAssignedWithActionsRedacted(player.Id)

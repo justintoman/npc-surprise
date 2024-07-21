@@ -9,16 +9,14 @@ import (
 
 type CreateActionPayload struct {
 	Content     string `json:"content" binding:"required"`
-	Order       int    `json:"order" binding:"required"`
 	CharacterId int    `json:"characterId" binding:"required"`
 }
 
 type Action struct {
 	Id          int    `json:"id" binding:"required"`
 	Content     string `json:"content" binding:"required"`
-	Order       int    `json:"order" binding:"required"`
 	CharacterId int    `json:"characterId" binding:"required"`
-	Revealed    bool   `json:"revealed" binding:"required"`
+	Revealed    bool   `json:"revealed"`
 }
 
 type ActionTable struct {
@@ -28,7 +26,7 @@ type ActionTable struct {
 func (db ActionTable) GetAll(characterId int) ([]Action, error) {
 	query := selectAll(db.from())
 	query = filterByCharacterId(query, characterId)
-	query = orderActions(query)
+	query = orderById(query)
 	data, _, err := query.Execute()
 	var actions []Action
 	json.Unmarshal(data, &actions)
@@ -39,7 +37,7 @@ func (db ActionTable) GetAllRevealed(characterId int) ([]Action, error) {
 	query := selectAll(db.from())
 	query = filterByCharacterId(query, characterId)
 	query = query.Filter("revealed", "eq", "true")
-	query = orderActions(query)
+	query = orderById(query)
 	data, _, err := query.Execute()
 	var actions []Action
 	json.Unmarshal(data, &actions)
@@ -80,10 +78,4 @@ func (db ActionTable) Delete(id int) error {
 
 func (db ActionTable) from() *postgrest.QueryBuilder {
 	return db.client.From("actions")
-}
-
-func orderActions(query *postgrest.FilterBuilder) *postgrest.FilterBuilder {
-	return query.Order("order", &postgrest.OrderOpts{
-		Ascending: true,
-	})
 }

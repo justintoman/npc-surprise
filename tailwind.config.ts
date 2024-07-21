@@ -1,5 +1,9 @@
+import type { Config } from 'tailwindcss';
+import tailwindAnimate from 'tailwindcss-animate';
+import defaultTheme from 'tailwindcss/defaultTheme';
+
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   darkMode: ['class'],
   content: [
     './pages/**/*.{ts,tsx}',
@@ -17,6 +21,9 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        serif: ['"Playfair Display"', ...defaultTheme.fontFamily.serif],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -73,5 +80,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
-};
+  plugins: [tailwindAnimate],
+} satisfies Config;

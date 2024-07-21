@@ -1,85 +1,96 @@
-import { useAtomValue } from 'jotai';
-import { PlusCircle } from 'lucide-react';
-import { useState } from 'react';
-import { ActionForm } from '~/AdminView/ActionForm';
-import { CharacterForm } from '~/AdminView/CharacterForm';
+import { Link } from 'react-router-dom';
+import { RevealFieldButton } from '~/Admin/RevealFieldButton';
 import { Action } from '~/components/Action';
 import { AssignCharacterButton } from '~/components/AssignCharacterButton';
 import { Button } from '~/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from '~/components/ui/dialog';
-import { getNewAction } from '~/lib/utils';
-import { isAdminAtom } from '~/state';
+import { Label } from '~/components/ui/label';
 import type { Character } from '~/types';
 
 type Props = {
   character: Character;
+  isAdmin?: boolean;
 };
 
-export function Character({ character }: Props) {
-  const isAdmin = useAtomValue(isAdminAtom);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isAddingAction, setIsAddingAction] = useState(false);
-
+export function Character({ character, isAdmin }: Props) {
   return (
-    <div className="space-y-2">
-      {isAdmin ? (
-        <div className="flex items-center justify-start space-x-4">
-          <AssignCharacterButton id={character.id} />
-          <Dialog open={isEditing} onOpenChange={setIsEditing}>
-            <DialogTrigger asChild>
-              <Button size="sm">Edit</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>Edit Character</DialogHeader>
-              <CharacterForm
-                id={character.id}
-                defaultValues={character}
-                onClose={() => setIsEditing(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      ) : null}
-      <h3>name: {character.name ?? 'hidden'}</h3>
-      <p>race: {(character.race ?? 'hidden') || '-'}</p>
-      <p>gender: {(character.gender ?? 'hidden') || '-'}</p>
-      <p>age: {(character.age ?? 'hidden') || '-'}</p>
-      <p>description: {(character.description ?? 'hidden') || '-'}</p>
-      <p>appearance: {(character.appearance ?? 'hidden') || '-'}</p>
+    <div className="max-w-md">
+      <div className="space-y-6 p-4">
+        <header className="flex justify-between">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-bold text-2xl">
+              {character.name || 'Name hidden'}
+            </h1>
 
-      <header className="flex items-center space-x-4">
+            <RevealFieldButton field="name" characterId={character.id} />
+          </div>
+
+          {isAdmin ? (
+            <div className="flex items-center justify-start space-x-4">
+              <AssignCharacterButton id={character.id} />
+              <Button size="sm" asChild>
+                <Link to={`/admin/character/${character.id}`}>Edit</Link>
+              </Button>
+            </div>
+          ) : null}
+        </header>
+
+        <div className="flex space-x-6">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Label className="text-sm font-bold">Age</Label>
+              <RevealFieldButton field="age" characterId={character.id} />
+            </div>
+            <p>{character.age || 'hidden'}</p>
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <Label className="text-sm font-bold">Race</Label>
+              <RevealFieldButton field="race" characterId={character.id} />
+            </div>
+            <p>{character.race || 'hidden'}</p>
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <Label className="text-sm font-bold">Gender</Label>
+              <RevealFieldButton field="gender" characterId={character.id} />
+            </div>
+            <p>{character.gender || 'hidden'}</p>
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center space-x-2">
+            <Label className="text-sm font-bold">Appearance</Label>
+            <RevealFieldButton field="appearance" characterId={character.id} />
+          </div>
+          <p>{character.appearance || 'hidden'}</p>
+        </div>
+        <div>
+          <div className="flex items-center space-x-2">
+            <Label className="text-sm font-bold">Description</Label>
+            <RevealFieldButton field="description" characterId={character.id} />
+          </div>
+          <p>{character.description || 'hidden'}</p>
+        </div>
+      </div>
+
+      <header className="mt-8 flex items-center space-x-4 px-4">
         <h3 className="text-lg font-bold">Actions</h3>
         {isAdmin ? (
-          <Dialog open={isAddingAction} onOpenChange={setIsAddingAction}>
-            <DialogTrigger asChild>
-              <Button size="icon">
-                <PlusCircle className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>Add Action</DialogHeader>
-              <ActionForm
-                characterId={character.id}
-                defaultValues={getNewAction()}
-                onClose={() => setIsAddingAction(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button size="icon" asChild>
+            <Link to={`/admin/${character.id}/action/new`}>Add</Link>
+          </Button>
         ) : null}
       </header>
       {character.actions.length ? (
-        <ul>
+        <ul className="divide-y">
           {character.actions.map((action) => (
-            <Action key={action.id} action={action} />
+            <li className="p-4" key={action.id}>
+              <Action action={action} isAdmin={isAdmin} />
+            </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm italic">You don't have any actions yet</p>
+        <p className="p-4 text-sm italic">You don't have any actions yet</p>
       )}
     </div>
   );

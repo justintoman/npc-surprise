@@ -20,17 +20,17 @@ func NewCharacterService(db db.Db, stream stream.StreamingServer) CharacterServi
 	}
 }
 
-func (s *CharacterService) Create(input db.CreateCharacterPayload) (db.CharacterWithActions, error) {
-	character, err := s.db.Character.Create(input)
+func (s *CharacterService) Create(input db.CreateCharacterPayload) (db.CharacterWithActions, db.CharacterReveleadFields, error) {
+	character, fields, err := s.db.Character.Create(input)
 	if err != nil {
 		slog.Error("Error creating character", "error", err)
-		return db.CharacterWithActions{}, err
+		return db.CharacterWithActions{}, db.CharacterReveleadFields{}, err
 	}
 	data := db.CharacterWithActions{
 		Character: character,
 		Actions:   make([]db.Action, 0),
 	}
-	return data, nil
+	return data, fields, nil
 }
 
 func (s *CharacterService) Update(input db.Character) (db.CharacterWithActions, error) {
@@ -51,25 +51,31 @@ func (s *CharacterService) Update(input db.Character) (db.CharacterWithActions, 
 	return data, nil
 }
 
-func (s *CharacterService) GetAllWithActions() ([]db.CharacterWithActions, error) {
+func (s *CharacterService) GetAllWithActionsAndFields() ([]db.CharacterWithActions, []db.CharacterReveleadFields, error) {
 	characters, err := s.db.Character.GetAll()
 	if err != nil {
 		slog.Error("Error fetching characters", "error", err)
-		return []db.CharacterWithActions{}, err
+		return []db.CharacterWithActions{}, []db.CharacterReveleadFields{}, err
 	}
+	fields := make([]db.CharacterReveleadFields, len(characters))
 	charsWithActions := make([]db.CharacterWithActions, len(characters))
 	for i, character := range characters {
 		actions, err := s.db.Action.GetAll(character.Id)
 		if err != nil {
 			slog.Error("error getting actions for character", "error", err, "characterId", character.Id)
-			return []db.CharacterWithActions{}, err
+			return []db.CharacterWithActions{}, []db.CharacterReveleadFields{}, err
 		}
 		charsWithActions[i] = db.CharacterWithActions{
 			Character: character,
 			Actions:   actions,
 		}
+		fields[i], err = s.db.Character.GetRevealedFields(character.Id)
+		if err != nil {
+			slog.Error("error getting revealed fields for character", "error", err, "characterId", character.Id)
+			return []db.CharacterWithActions{}, []db.CharacterReveleadFields{}, err
+		}
 	}
-	return charsWithActions, nil
+	return charsWithActions, fields, nil
 }
 
 func (s *CharacterService) GetAllAssignedWithActionsRedacted(playerId int) ([]db.CharacterWithActions, error) {
@@ -210,29 +216,29 @@ func (s *CharacterService) Unassign(characterId int) (int, db.CharacterWithActio
 	return prevPlayerId, withActions, nil
 }
 
-func (s *CharacterService) UpdateRevealedFields(input db.CharacterReveleadFields) (db.CharacterWithActions, error) {
+func (s *CharacterService) UpdateRevealedFields(input db.CharacterReveleadFields) (db.CharacterWithActions, db.CharacterReveleadFields, error) {
 	fields, err := s.db.Character.UpdateRevealedFields(input)
 	if err != nil {
 		slog.Error("error getting character to update", "error", err, "characterId", input.CharacterId)
-		return db.CharacterWithActions{}, err
+		return db.CharacterWithActions{}, db.CharacterReveleadFields{}, err
 	}
 
 	character, err := s.db.Character.Get(fields.CharacterId)
 	if err != nil {
 		slog.Error("error getting character to update", "error", err, "characterId", input.CharacterId)
-		return db.CharacterWithActions{}, err
+		return db.CharacterWithActions{}, db.CharacterReveleadFields{}, err
 	}
 
 	actions, err := s.db.Action.GetAll(character.Id)
 	if err != nil {
 		slog.Error("error getting actions for character", "error", err, "characterId", character.Id)
-		return db.CharacterWithActions{}, err
+		return db.CharacterWithActions{}, db.CharacterReveleadFields{}, err
 	}
 	withActions := db.CharacterWithActions{
 		Character: character,
 		Actions:   actions,
 	}
-	return withActions, nil
+	return withActions, fields, nil
 }
 
 func (s *CharacterService) Delete(id int) error {

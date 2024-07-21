@@ -31,8 +31,9 @@ type StreamingServer interface {
 	SendHideCharacterMessage(playerId int, character db.CharacterWithActions)
 
 	// admin messages
-	SendInitAdminMessage(players []db.Player, characters []db.CharacterWithActions)
+	SendInitAdminMessage(players []db.Player, characters []db.CharacterWithActions, fields []db.CharacterReveleadFields)
 	SendAdminCharacterMessage(character db.CharacterWithActions)
+	SendAdminCharacterMessageWithFields(character db.CharacterWithActions, fields db.CharacterReveleadFields)
 	SendAdminActionMessage(action db.Action)
 	SendPlayerConnectedMessage(player db.Player)
 	SendPlayerDisconnectedMessage(playerId int)
@@ -56,7 +57,7 @@ func (stream *EventStream) Close(clientChan ClientChan) {
 }
 
 func (stream *EventStream) sendMessage(playerId int, message any) {
-	slog.Info("Sending message", "clientId", playerId, "message", message)
+	slog.Info("Sending message", "clientId", playerId)
 	stream.Message <- Message{PlayerId: playerId, Payload: message}
 }
 

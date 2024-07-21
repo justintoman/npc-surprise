@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { NpcSurpriseApi } from '~/api';
 import { Button } from '~/components/ui/button';
 import {
   Form,
@@ -15,30 +14,23 @@ import { Input } from '~/components/ui/input';
 import { Textarea } from '~/components/ui/textarea';
 
 type Props = {
-  id?: number;
-  defaultValues?: CharacterFormInput;
+  defaultValues: CharacterFormInput;
   onClose(): void;
+  onSubmit(data: CharacterFormInput): void;
 };
 
-export function CharacterForm({ id, defaultValues, onClose }: Props) {
+export function CharacterForm({ defaultValues, onClose, onSubmit }: Props) {
   const methods = useForm<CharacterFormInput>({
     resolver: zodResolver(schema),
     defaultValues,
   });
 
-  async function submit(data: CharacterFormInput) {
-    if (id) {
-      await NpcSurpriseApi.updateCharacter({ id, ...data });
-    } else {
-      await NpcSurpriseApi.createCharacter(data);
-    }
-
-    onClose();
-  }
-
   return (
     <Form {...methods}>
-      <form onSubmit={methods.handleSubmit(submit)} className="space-y-4">
+      <form
+        onSubmit={methods.handleSubmit(onSubmit)}
+        className="mx-auto max-w-lg space-y-4"
+      >
         <FormField
           control={methods.control}
           name="name"

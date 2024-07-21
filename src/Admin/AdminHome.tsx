@@ -1,51 +1,32 @@
 import { useAtomValue } from 'jotai';
 import { PlusCircle, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { CharacterForm } from '~/AdminView/CharacterForm';
+import { Link } from 'react-router-dom';
 import { NpcSurpriseApi } from '~/api';
 import { Character } from '~/components/Character';
 import { Button } from '~/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from '~/components/ui/dialog';
-import { getNewCharacter } from '~/lib/utils';
-import { charactersAtom, initStream, playersAtom } from '~/state';
+import { charactersAtom, playersAtom } from '~/state';
 
-export function AdminView() {
+export function AdminHome() {
   const characters = useAtomValue(charactersAtom);
-  const [isAddingCharacter, setIsAddingCharacter] = useState(false);
-
-  useEffect(() => {
-    return initStream();
-  }, []);
 
   return (
     <div className="flex">
       <div className="grow space-y-4">
         <header className="flex items-center space-x-4">
-          <h2 className="text-lg font-bold">Characters</h2>
-          <Dialog open={isAddingCharacter} onOpenChange={setIsAddingCharacter}>
-            <DialogTrigger asChild>
-              <Button size="icon">
-                <PlusCircle className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>Add Character</DialogHeader>
-              <CharacterForm
-                defaultValues={getNewCharacter()}
-                onClose={() => setIsAddingCharacter(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button asChild>
+            <Link to="/admin/character/new" className="flex items-center gap-2">
+              Add Character
+              <PlusCircle className="h-4 w-4" />
+            </Link>
+          </Button>
         </header>
-        <ul>
+        <ul className="flex flex-wrap items-start gap-4">
           {characters.map((char) => (
-            <li key={char.id}>
-              <Character character={char} />
+            <li
+              key={char.id}
+              className="fit-content rounded-lg border border-secondary"
+            >
+              <Character character={char} isAdmin />
             </li>
           ))}
         </ul>
@@ -71,7 +52,7 @@ function PlayersList() {
             <div className="leading-0 flex h-full items-center space-x-2">
               <div
                 title={player.isOnline ? 'Online' : 'Offline'}
-                className="h-3 w-3 rounded-full bg-gray-500 group-data-[online=true]:bg-teal-500"
+                className="h-3 w-3 rounded-full bg-muted group-data-[online=true]:bg-teal-500"
               />
               <span className="text-muted-foreground group-data-[online=true]:font-bold group-data-[online=true]:text-secondary-foreground">
                 {player.name}

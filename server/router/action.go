@@ -15,11 +15,14 @@ func (r *Router) CreateAction(c *gin.Context, input *db.CreateActionPayload) err
 }
 
 func (r *Router) UpdateAction(c *gin.Context, input *db.Action) error {
-	action, err := r.ActionService.Update(*input)
+	playerId, action, err := r.ActionService.Update(*input)
 	if err != nil {
 		return err
 	}
 	r.stream.SendAdminActionMessage(action)
+	if playerId != 0 {
+		r.stream.SendPlayerActionMessage(playerId, action)
+	}
 	return nil
 }
 

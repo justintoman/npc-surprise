@@ -51,3 +51,9 @@ func insertSingle(queryBuilder *postgrest.QueryBuilder, payload interface{}) *po
 func deleteSingle(filterBuilder *postgrest.QueryBuilder) *postgrest.FilterBuilder {
 	return filterBuilder.Delete("", "").Single()
 }
+
+func orderById(queryBuilder *postgrest.FilterBuilder) *postgrest.FilterBuilder {
+	return queryBuilder.Order("id", &postgrest.OrderOpts{
+		Ascending: true,
+	})
+}

@@ -10,20 +10,12 @@ export function PlayerView() {
   }, []);
 
   return (
-    <div>
-      <header>
-        <h1>Player View</h1>
-      </header>
-
-      <h2 className="text-lg font-bold">Assigned Characters</h2>
-
-      <ul>
-        {characters.map((char) => (
-          <li key={char.id}>
-            <Character character={char} />
-          </li>
-        ))}
-      </ul>
+    <div className="space-y-4 divide-y-2">
+      {characters.map((char) => (
+        <div key={char.id}>
+          <Character character={char} />
+        </div>
+      ))}
     </div>
   );
 }

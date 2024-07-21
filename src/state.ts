@@ -1,6 +1,6 @@
 import { atom, createStore } from 'jotai';
-import { StatusResponse } from '~/api';
-import { Action, Character, Player } from '~/types';
+import { atomFamily } from 'jotai/utils';
+import { Action, Character, CharacterRevealedFields, Player } from '~/types';
 
 export const store = createStore();
 
@@ -18,7 +18,6 @@ export function initStream() {
 
   eventSource.onerror = (e) => {
     console.error(e);
-    store.set(statusAtom, null);
   };
 
   return function close() {
@@ -31,16 +30,30 @@ type CharacterMessage = {
   data: Character;
 };
 
+type CharacterWithFieldsMessage = {
+  type: 'character-with-fields';
+  data: {
+    character: Character;
+    fields: CharacterRevealedFields;
+  };
+};
+
 type ActionMessage = {
   type: 'action';
   data: Action;
 };
 
-type InitMessage = {
-  type: 'init';
+type InitPlayerMessage = {
+  type: 'init-player';
+  data: Character[];
+};
+
+type InitAdminMessage = {
+  type: 'init-admin';
   data: {
     players: Player[];
     characters: Character[];
+    fields: CharacterRevealedFields[];
   };
 };
 
@@ -60,8 +73,10 @@ type DeleteMessage = {
 };
 
 type Message =
-  | InitMessage
+  | InitPlayerMessage
+  | InitAdminMessage
   | CharacterMessage
+  | CharacterWithFieldsMessage
   | ActionMessage
   | PlayerConnectedMessage
   | PlayerDisconnectedMessage
@@ -69,9 +84,15 @@ type Message =
 
 function handleEvents(message: Message) {
   switch (message.type) {
-    case 'init': {
+    case 'init-admin': {
       store.set(playersAtomInternal, message.data.players);
       store.set(charactersAtomInternal, message.data.characters);
+      store.set(characterRevealedFieldsInternal, message.data.fields);
+      break;
+    }
+
+    case 'init-player': {
+      store.set(charactersAtomInternal, message.data);
       break;
     }
 
@@ -85,6 +106,38 @@ function handleEvents(message: Message) {
               char.id === message.data.id ? message.data : char,
             )
           : [...characters, message.data],
+      );
+      break;
+    }
+
+    case 'character-with-fields': {
+      const characters = store.get(charactersAtomInternal);
+      const exists = characters.some(
+        (char) => char.id === message.data.character.id,
+      );
+      store.set(
+        charactersAtomInternal,
+        exists
+          ? characters.map((char) =>
+              char.id === message.data.character.id
+                ? message.data.character
+                : char,
+            )
+          : [...characters, message.data.character],
+      );
+      const fields = store.get(characterRevealedFieldsInternal);
+      const fieldExists = fields.some(
+        (f) => f.characterId === message.data.character.id,
+      );
+      store.set(
+        characterRevealedFieldsInternal,
+        fieldExists
+          ? fields.map((f) =>
+              f.characterId === message.data.character.id
+                ? message.data.fields
+                : f,
+            )
+          : [...fields, message.data.fields],
       );
       break;
     }
@@ -187,9 +240,25 @@ export const charactersAtom = atom<Character[]>((get) =>
   get(charactersAtomInternal),
 );
 
-export const statusAtom = atom<StatusResponse | null>(null);
+export const characterAtomFamily = atomFamily((id: number) =>
+  atom((get) => get(charactersAtomInternal).find((char) => char.id === id)),
+);
 
-export const isAdminAtom = atom((get) => {
-  const status = get(statusAtom);
-  return Boolean(status?.isAdmin);
-});
+export const actionAtomFamily = atomFamily((id: number) =>
+  atom((get) =>
+    get(charactersAtom)
+      .flatMap((char) => char.actions)
+      .find((action) => action.id === id),
+  ),
+);
+
+const characterRevealedFieldsInternal = atom<CharacterRevealedFields[]>([]);
+
+export const characterRevealedFieldsAtomFamily = atomFamily((id: number) =>
+  atom<CharacterRevealedFields | undefined>((get) => {
+    const fields = get(characterRevealedFieldsInternal).find(
+      (f) => f.characterId === id,
+    );
+    return fields;
+  }),
+);
