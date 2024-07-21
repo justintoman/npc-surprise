@@ -5,7 +5,8 @@ import { Action, Character, CharacterRevealedFields, Player } from '~/types';
 export const store = createStore();
 
 export function initStream() {
-  const eventSource = new EventSource('/api/stream');
+  const url = `${import.meta.env.VITE_API_PREFIX ?? ''}/stream`;
+  const eventSource = new EventSource(url);
   eventSource.onopen = () => {
     console.log('connected');
   };
@@ -234,6 +235,14 @@ function handleEvents(message: Message) {
 
 const playersAtomInternal = atom<Player[]>([]);
 export const playersAtom = atom<Player[]>((get) => get(playersAtomInternal));
+export const playerAtomFamily = atomFamily((id: number | undefined) =>
+  atom((get) => {
+    if (id === undefined) {
+      return undefined;
+    }
+    return get(playersAtomInternal).find((player) => player.id === id);
+  }),
+);
 
 const charactersAtomInternal = atom<Character[]>([]);
 export const charactersAtom = atom<Character[]>((get) =>

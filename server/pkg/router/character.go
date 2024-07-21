@@ -2,7 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/justintoman/npc-surprise/db"
+	"github.com/justintoman/npc-surprise/pkg/db"
 )
 
 type CreateCharacterInput struct {

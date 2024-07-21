@@ -16,27 +16,54 @@ export const router = createBrowserRouter([
     children: [
       {
         async loader() {
+          console.log('login loader');
           const status = await NpcSurpriseApi.status();
           if (status.isAdmin) {
+            console.log('redirect to admin');
             return redirect('/admin');
           }
-          if (!status.playerId) {
-            return redirect('/login');
+          if (status.id) {
+            console.log('redirect to player');
+            return redirect('/');
           }
-
-          return redirect('/player');
+          return null;
         },
-        path: '/',
-      },
-      {
         path: '/login',
         element: <PlayerLogin />,
       },
       {
-        path: '/player',
+        async loader() {
+          console.log('player loader');
+          const status = await NpcSurpriseApi.status();
+          if (status.isAdmin) {
+            console.log('redirect to admin');
+            return redirect('/admin');
+          }
+          if (status.id) {
+            return null;
+          }
+
+          console.log('redirect to login');
+          return redirect('/login');
+        },
+        path: '/',
         element: <PlayerView />,
       },
       {
+        async loader() {
+          console.log('admin loader');
+          const status = await NpcSurpriseApi.status();
+          if (status.isAdmin) {
+            return null;
+          }
+          if (status.id) {
+            console.log('redirect to player');
+            return redirect('/');
+          }
+
+          console.log('redirect to login');
+          return redirect('/login');
+        },
         path: '/admin',
         element: <AdminPage />,
         children: [

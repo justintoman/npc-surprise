@@ -1,9 +1,11 @@
+import { useAtomValue } from 'jotai';
 import { Link } from 'react-router-dom';
 import { RevealFieldButton } from '~/Admin/RevealFieldButton';
 import { Action } from '~/components/Action';
 import { AssignCharacterButton } from '~/components/AssignCharacterButton';
 import { Button } from '~/components/ui/button';
 import { Label } from '~/components/ui/label';
+import { playerAtomFamily } from '~/state';
 import type { Character } from '~/types';
 
 type Props = {
@@ -12,8 +14,9 @@ type Props = {
 };
 
 export function Character({ character, isAdmin }: Props) {
+  const player = useAtomValue(playerAtomFamily(character.playerId));
   return (
-    <div className="max-w-md">
+    <div className="max-w-lg">
       <div className="space-y-6 p-4">
         <header className="flex justify-between">
           <div className="flex items-center space-x-2">
@@ -34,28 +37,36 @@ export function Character({ character, isAdmin }: Props) {
           ) : null}
         </header>
 
-        <div className="flex space-x-6">
-          <div>
-            <div className="flex items-center space-x-2">
-              <Label className="text-sm font-bold">Age</Label>
-              <RevealFieldButton field="age" characterId={character.id} />
+        <div className="flex justify-between">
+          <div className="flex space-x-6">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Label className="text-sm font-bold">Age</Label>
+                <RevealFieldButton field="age" characterId={character.id} />
+              </div>
+              <p>{character.age || 'hidden'}</p>
             </div>
-            <p>{character.age || 'hidden'}</p>
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <Label className="text-sm font-bold">Race</Label>
-              <RevealFieldButton field="race" characterId={character.id} />
+            <div>
+              <div className="flex items-center space-x-2">
+                <Label className="text-sm font-bold">Race</Label>
+                <RevealFieldButton field="race" characterId={character.id} />
+              </div>
+              <p>{character.race || 'hidden'}</p>
             </div>
-            <p>{character.race || 'hidden'}</p>
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <Label className="text-sm font-bold">Gender</Label>
-              <RevealFieldButton field="gender" characterId={character.id} />
+            <div>
+              <div className="flex items-center space-x-2">
+                <Label className="text-sm font-bold">Gender</Label>
+                <RevealFieldButton field="gender" characterId={character.id} />
+              </div>
+              <p>{character.gender || 'hidden'}</p>
             </div>
-            <p>{character.gender || 'hidden'}</p>
           </div>
+          {player && isAdmin ? (
+            <div className="rounded-sm bg-secondary p-2">
+              <Label className="text-sm font-bold">Assigned to</Label>
+              <p>{player.name}</p>
+            </div>
+          ) : null}
         </div>
         <div>
           <div className="flex items-center space-x-2">

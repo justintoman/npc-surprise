@@ -3,7 +3,7 @@ package stream
 import (
 	"log/slog"
 
-	"github.com/justintoman/npc-surprise/db"
+	"github.com/justintoman/npc-surprise/pkg/db"
 )
 
 const AdminPlayerId = 0

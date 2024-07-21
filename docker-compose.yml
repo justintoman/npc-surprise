@@ -1,0 +1,12 @@
+services:
+  ui:
+    image: forecast-ui:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: ./server/.env
+    environment:
+      - NODE_ENV=production
+      - GIN_MODE=release
+    ports:
+      - '8080:8080'

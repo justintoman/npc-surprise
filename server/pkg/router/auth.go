@@ -2,10 +2,11 @@ package router
 
 import (
 	"encoding/json"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/justintoman/npc-surprise/db"
-	"github.com/justintoman/npc-surprise/stream"
+	"github.com/justintoman/npc-surprise/pkg/db"
+	"github.com/justintoman/npc-surprise/pkg/stream"
 )
 
 type LoginInput struct {
@@ -124,8 +125,6 @@ func (r Router) AdminMiddleware(c *gin.Context) {
 
 func (r *Router) PlayerMiddleware(c *gin.Context) {
 	player, err := parsePlayerFromCookie(c)
-	c.Set("player", player)
-
 	if err != nil {
 		c.AbortWithStatusJSON(401, ErrorResponse{Message: "Invalid Player. Try logging in again.", Status: 401})
 		return
@@ -139,6 +138,7 @@ func parsePlayerFromCookie(c *gin.Context) (db.Player, error) {
 	cookie, err := c.Cookie("player")
 	if err != nil {
 		// player cookie is boned, unset it
+		slog.Info("player cookie is boned, unset it", "error", err)
 		clearPlayerCookie(c)
 		return db.Player{}, err
 	}
@@ -147,9 +147,12 @@ func parsePlayerFromCookie(c *gin.Context) (db.Player, error) {
 	err = json.Unmarshal([]byte(cookie), &player)
 	if err != nil {
 		// player cookie is boned, unset it
+		slog.Info("player cookie failed to be unmarshalled, unset it", "error", err)
 		clearPlayerCookie(c)
 		return db.Player{}, err
 	}
+
+	slog.Info("player cookie is valid", "playerId", player.Id, "playerName", player.Name)
 
 	return player, nil
 }

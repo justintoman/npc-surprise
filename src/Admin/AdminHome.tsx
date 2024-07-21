@@ -20,13 +20,12 @@ export function AdminHome() {
             </Link>
           </Button>
         </header>
-        <ul className="flex flex-wrap items-start gap-4">
+        <ul className="grid grid-cols-2 gap-4">
           {characters.map((char) => (
-            <li
-              key={char.id}
-              className="fit-content rounded-lg border border-secondary"
-            >
-              <Character character={char} isAdmin />
+            <li key={char.id}>
+              <div className="fit-content rounded-lg border border-secondary bg-secondary/30">
+                <Character character={char} isAdmin />
+              </div>
             </li>
           ))}
         </ul>
@@ -47,7 +46,7 @@ function PlayersList() {
           <li
             key={player.id}
             data-online={player.isOnline}
-            className="group flex items-center justify-between space-x-2 rounded-sm px-4 py-2"
+            className="group flex items-center justify-between space-x-2 rounded-sm px-4 py-1"
           >
             <div className="leading-0 flex h-full items-center space-x-2">
               <div
@@ -59,11 +58,11 @@ function PlayersList() {
               </span>
             </div>
             <Button
-              size="icon"
+              size="tiny"
               variant="outline"
               onClick={() => NpcSurpriseApi.deletePlayer(player.id)}
             >
-              <X className="h-4 w-4" />
+              <X className="h-3 w-3" />
             </Button>
           </li>
         ))}

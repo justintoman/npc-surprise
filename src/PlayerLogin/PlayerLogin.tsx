@@ -27,7 +27,7 @@ export function PlayerLogin({ name }: { name?: string }) {
       if (status.isAdmin) {
         navigate('/admin');
       } else {
-        navigate('/player');
+        navigate('/');
       }
     } catch (error) {
       console.error(error);

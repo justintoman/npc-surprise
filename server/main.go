@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/justintoman/npc-surprise/db"
-	"github.com/justintoman/npc-surprise/router"
+	"github.com/justintoman/npc-surprise/pkg/db"
+	"github.com/justintoman/npc-surprise/pkg/router"
 )
 
 func main() {

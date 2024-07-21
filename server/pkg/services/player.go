@@ -3,8 +3,8 @@ package services
 import (
 	"log/slog"
 
-	"github.com/justintoman/npc-surprise/db"
-	"github.com/justintoman/npc-surprise/stream"
+	"github.com/justintoman/npc-surprise/pkg/db"
+	"github.com/justintoman/npc-surprise/pkg/stream"
 )
 
 type PlayerService struct {

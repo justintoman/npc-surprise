@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/justintoman/npc-surprise/db"
+	"github.com/justintoman/npc-surprise/pkg/db"
 )
 
 // This file is heavily inspired by
@@ -47,7 +47,7 @@ func New(db db.Db) StreamingServer {
 		Message:       make(chan Message),
 		NewClients:    make(chan ClientChan),
 		ClosedClients: make(chan ClientChan),
-		TotalClients:  make(map[int]ClientChan),
+		TotalClients:  make(map[ClientChan]bool),
 	}
 	return eventStream
 }
@@ -62,9 +62,10 @@ func (stream *EventStream) sendMessage(playerId int, message any) {
 }
 
 func (stream *EventStream) sendAdminMessage(message any) {
-	if _, ok := stream.TotalClients[AdminPlayerId]; !ok {
-		slog.Info("no admin connected, skipping message", "message", message)
-		return
+	for client := range stream.TotalClients {
+		if client.Id == AdminPlayerId {
+			stream.sendMessage(client.Id, message)
+		}
 	}
 
 	stream.sendMessage(AdminPlayerId, message)
@@ -72,7 +73,7 @@ func (stream *EventStream) sendAdminMessage(message any) {
 
 func (stream *EventStream) GetClients() []db.Player {
 	clients := make([]db.Player, 0, len(stream.TotalClients))
-	for _, client := range stream.TotalClients {
+	for client := range stream.TotalClients {
 		clients = append(clients, client.Player)
 	}
 	return clients
@@ -94,7 +95,7 @@ type EventStream struct {
 	NewClients    chan ClientChan
 	ClosedClients chan ClientChan
 	// map of clients by string topic
-	TotalClients map[int]ClientChan
+	TotalClients map[ClientChan]bool
 }
 
 func (stream *EventStream) Listen(c context.Context) {
@@ -102,29 +103,34 @@ func (stream *EventStream) Listen(c context.Context) {
 		select {
 		// Add new available client
 		case client := <-stream.NewClients:
-			stream.TotalClients[client.Id] = client
+			stream.TotalClients[client] = true
 			names := make([]string, 0)
-			for _, client := range stream.TotalClients {
+			for client := range stream.TotalClients {
 				names = append(names, client.Name)
 			}
 			slog.Info(fmt.Sprintf("Client added. %d registered clients. Clients: %+v", len(stream.TotalClients), names))
 
 		// Remove closed client
 		case client := <-stream.ClosedClients:
-			slog.Info("Client closed", "id", client.Id)
-			delete(stream.TotalClients, client.Id)
+			slog.Info("Client closed", "id", client.Id, "name", client.Name)
+			delete(stream.TotalClients, client)
 			close(client.Channel)
 			slog.Info(fmt.Sprintf("Removed client. %d registered clients", len(stream.TotalClients)))
 
 		// Broadcast message to client
 		case eventMsg := <-stream.Message:
-			client, ok := stream.TotalClients[eventMsg.PlayerId]
-			if !ok {
+			sentMessage := false
+			for client := range stream.TotalClients {
+				if client.Id == eventMsg.PlayerId {
+					sentMessage = true
+					client.Channel <- eventMsg.Payload
+				}
+			}
+			if !sentMessage {
 				slog.Error(fmt.Sprintf("Attempted to send message to a client that doesn't exist. Id: %d", eventMsg.PlayerId))
 				continue
 			}
 
-			client.Channel <- eventMsg.Payload
 		case <-c.Done():
 			return
 		}
@@ -143,7 +149,16 @@ func (stream *EventStream) NewUserStream(onAdded OnClientAddedFunc, onRemoved On
 		c.Writer.Header().Set("Connection", "keep-alive")
 		c.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-		player := c.MustGet("player").(db.Player)
+		ctxPlayer, ok := c.Get("player")
+		if !ok {
+			slog.Info("Player not found. Is Middleware applied?")
+			c.AbortWithStatusJSON(401, gin.H{"message": "Invalid Player. Try logging in again.", "status": 401})
+			return
+		}
+
+		player := ctxPlayer.(db.Player)
+
+		slog.Info("Player connected, creating client", "id", player.Id, "name", player.Name)
 
 		clientChan := ClientChan{
 			Channel: make(chan any),
@@ -154,12 +169,12 @@ func (stream *EventStream) NewUserStream(onAdded OnClientAddedFunc, onRemoved On
 		}
 		stream.NewClients <- clientChan
 
-		onAdded(player)
+		go onAdded(player)
 
 		go func() {
 			<-c.Writer.CloseNotify()
 			stream.Close(clientChan)
-			onRemoved(player)
+			go onRemoved(player)
 		}()
 
 		c.Set("clientChan", clientChan)

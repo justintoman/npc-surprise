@@ -8,8 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getNewAction(): Omit<Action, 'id' | 'characterId'> {
   return {
-    type: '',
-    direction: '',
+    revealed: false,
     content: '',
   };
 }

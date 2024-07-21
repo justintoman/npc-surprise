@@ -1,8 +1,10 @@
 import ky from 'ky';
 import { Action, Character, CharacterRevealedFields } from '~/types';
 
+const prefixUrl = import.meta.env.VITE_API_PREFIX;
+
 const client = ky.create({
-  prefixUrl: '/api',
+  prefixUrl,
 });
 
 export const NpcSurpriseApi = {
@@ -84,6 +86,6 @@ export const NpcSurpriseApi = {
 
 export type StatusResponse = {
   isAdmin: boolean;
-  playerId?: string;
-  playerName?: string;
+  id?: string;
+  name?: string;
 };

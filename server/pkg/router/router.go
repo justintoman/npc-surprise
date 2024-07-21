@@ -5,9 +5,10 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/justintoman/npc-surprise/db"
-	"github.com/justintoman/npc-surprise/services"
-	"github.com/justintoman/npc-surprise/stream"
+	"github.com/justintoman/npc-surprise/pkg/db"
+	"github.com/justintoman/npc-surprise/pkg/services"
+	"github.com/justintoman/npc-surprise/pkg/spa"
+	"github.com/justintoman/npc-surprise/pkg/stream"
 	"github.com/loopfz/gadgeto/tonic"
 )
 
@@ -39,10 +40,13 @@ func New(db db.Db, adminKey string) *gin.Engine {
 
 	g := gin.Default()
 
-	g.POST("/login", tonic.Handler(router.Login, 200))
-	g.GET("/status", tonic.Handler(router.Status, 200))
+	g.Use(spa.Middleware("/", "./dist"))
 
-	adminRoutes := g.Group("/")
+	api := g.Group("/")
+	api.POST("/login", tonic.Handler(router.Login, 200))
+	api.GET("/status", tonic.Handler(router.Status, 200))
+
+	adminRoutes := api.Group("/")
 	adminRoutes.Use(router.AdminMiddleware)
 	adminRoutes.DELETE("players/:id", tonic.Handler(router.DeletePlayer, 200))
 
@@ -61,7 +65,7 @@ func New(db db.Db, adminKey string) *gin.Engine {
 	actionRoutes.PUT(":actionId/hide", tonic.Handler(router.HideAction, 200))
 	actionRoutes.DELETE(":actionId", tonic.Handler(router.DeleteAction, 200))
 
-	authRoutes := g.Group("/")
+	authRoutes := api.Group("/")
 
 	middleware, handler := streamService.NewUserStream(router.onPlayerConnected, router.onPlayerDisconnected)
 	authRoutes.GET("/stream", router.PlayerMiddleware, middleware, tonic.Handler(handler, 200))

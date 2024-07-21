@@ -27,7 +27,7 @@ function StageDirection({
       className="flex items-start gap-2 rounded-lg bg-purple-100 p-4 font-sans text-sm text-black"
       {...props}
     >
-      <Drama />
+      <Drama className="h-5 w-5 shrink-0" />
       {children}
     </h2>
   );

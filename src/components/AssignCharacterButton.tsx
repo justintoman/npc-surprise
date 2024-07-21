@@ -24,7 +24,10 @@ export function AssignCharacterButton({ id }: Props) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem onClick={() => NpcSurpriseApi.unassignCharacter(id)}>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() => NpcSurpriseApi.unassignCharacter(id)}
+        >
           Unassign
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -32,8 +35,18 @@ export function AssignCharacterButton({ id }: Props) {
           <DropdownMenuItem
             key={player.id}
             onClick={() => NpcSurpriseApi.assignCharacter(id, player.id)}
+            data-online={player.isOnline}
+            className="group flex cursor-pointer items-center justify-between rounded-sm"
           >
-            {player.name}
+            <div className="leading-0 flex h-full items-center space-x-2">
+              <div
+                title={player.isOnline ? 'Online' : 'Offline'}
+                className="h-3 w-3 rounded-full bg-muted group-data-[online=true]:bg-teal-500"
+              />
+              <span className="text-muted-foreground group-data-[online=true]:font-bold group-data-[online=true]:text-secondary-foreground">
+                {player.name}
+              </span>
+            </div>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
