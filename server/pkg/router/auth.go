@@ -14,7 +14,7 @@ type LoginInput struct {
 }
 
 func (r Router) Login(c *gin.Context, input *LoginInput) (LoginResponse, error) {
-	player, err := parsePlayerFromCookie(c)
+	player, err := r.parsePlayerFromCookie(c)
 	if err != nil {
 		if input.Name == r.AdminKey {
 			// admin logging in
@@ -93,7 +93,7 @@ type LoginResponse struct {
 type StatusResponse LoginResponse
 
 func (r Router) Status(c *gin.Context) (StatusResponse, error) {
-	player, err := parsePlayerFromCookie(c)
+	player, err := r.parsePlayerFromCookie(c)
 	if err != nil {
 		return StatusResponse{
 			IsAdmin: false,
@@ -109,7 +109,7 @@ func (r Router) Status(c *gin.Context) (StatusResponse, error) {
 }
 
 func (r Router) AdminMiddleware(c *gin.Context) {
-	player, err := parsePlayerFromCookie(c)
+	player, err := r.parsePlayerFromCookie(c)
 	if err != nil {
 		c.AbortWithStatusJSON(401, ErrorResponse{Message: "Unauthorized. You are not Justin.", Status: 401})
 		return
@@ -124,7 +124,7 @@ func (r Router) AdminMiddleware(c *gin.Context) {
 }
 
 func (r *Router) PlayerMiddleware(c *gin.Context) {
-	player, err := parsePlayerFromCookie(c)
+	player, err := r.parsePlayerFromCookie(c)
 	if err != nil {
 		c.AbortWithStatusJSON(401, ErrorResponse{Message: "Invalid Player. Try logging in again.", Status: 401})
 		return
@@ -134,7 +134,7 @@ func (r *Router) PlayerMiddleware(c *gin.Context) {
 	c.Next()
 }
 
-func parsePlayerFromCookie(c *gin.Context) (db.Player, error) {
+func (r *Router) parsePlayerFromCookie(c *gin.Context) (db.Player, error) {
 	cookie, err := c.Cookie("player")
 	if err != nil {
 		// player cookie is boned, unset it
@@ -148,6 +148,19 @@ func parsePlayerFromCookie(c *gin.Context) (db.Player, error) {
 	if err != nil {
 		// player cookie is boned, unset it
 		slog.Info("player cookie failed to be unmarshalled, unset it", "error", err)
+		clearPlayerCookie(c)
+		return db.Player{}, err
+	}
+
+	if player.Id == stream.AdminPlayerId {
+		slog.Info("player cookie is admin", "playerId", player.Id, "playerName", player.Name)
+		return player, nil
+	}
+
+	_, err = r.PlayerService.Get(player.Id)
+	if err != nil {
+		// player cookie is boned, unset it
+		slog.Info("cookie seems good but there's no player in the db for it", "error", err, "player", player)
 		clearPlayerCookie(c)
 		return db.Player{}, err
 	}

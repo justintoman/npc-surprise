@@ -33,7 +33,7 @@ COPY src ./src
 COPY public ./public
 COPY package.json package-lock.json ./
 COPY tsconfig.app.json tsconfig.json tsconfig.node.json ./
-COPY vite.config.ts tailwind.config.ts postcss.config.js index.html ./
+COPY vite.config.ts tailwind.config.ts postcss.config.js index.html .env.production ./
 
 RUN npm run build
 

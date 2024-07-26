@@ -46,6 +46,15 @@ func (s *PlayerService) GetAll() ([]db.Player, error) {
 	return players, nil
 }
 
+func (s *PlayerService) Get(id int) (db.Player, error) {
+	player, err := s.db.Player.Get(id)
+	if err != nil {
+		slog.Error("Error fetching player", "error", err)
+		return db.Player{}, err
+	}
+	return player, nil
+}
+
 func (s *PlayerService) Delete(id int) error {
 	err := s.db.Player.Delete(id)
 	if err != nil {
